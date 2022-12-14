@@ -9,4 +9,4 @@ const postSchema = new Schema({
   comments: [{ type: Schema.Types.ObjectId, ref: "Comments" }],
 });
 
-exports.module("Posts", postSchema);
+module.exports("Posts", postSchema);

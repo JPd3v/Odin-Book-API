@@ -8,11 +8,11 @@ const userSchema = new Schema({
   last_name: { type: String, required: true },
   creation_date: { type: Date, required: true, default: Date.now },
   gender: { type: String, enum: ["male", "female", "other"] },
-  birthday: { type: Date, required: true },
+  birthday: { type: String, required: true },
   refresh_token: { type: String, default: "" },
   friend_requests: [{ type: Schema.Types.ObjectId, ref: "User" }],
   friend_list: [{ type: Schema.Types.ObjectId, ref: "Users" }],
-})
+});
 
 userSchema.set("toJSON", {
   transform: function (doc, ret, options) {
@@ -20,4 +20,4 @@ userSchema.set("toJSON", {
     return ret;
   },
 });
-exports.module = mongoose.model("Users", userSchema);
+module.exports = mongoose.model("Users", userSchema);
