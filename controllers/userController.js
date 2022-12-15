@@ -46,7 +46,7 @@ exports.postSignUp = [
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(409).json({ errors: errors.array() });
+      return res.status(422).json({ errors: errors.array() });
     }
 
     try {
@@ -58,6 +58,10 @@ exports.postSignUp = [
       }
 
       bcrypt.hash(req.body.password, 12, async (error, hashedPassword) => {
+        if (error) {
+          return res.status(500).json({ error: "something went wrong" });
+        }
+
         const newUser = new User({
           username: req.body.username,
           password: hashedPassword,
@@ -72,23 +76,22 @@ exports.postSignUp = [
           const refreshToken = getRefreshToken({ _id: savedUser._id });
           const token = getToken({ _id: savedUser._id });
 
+          savedUser.refresh_token = refreshToken;
+          await savedUser.save();
+
           const userInfo = {
             first_name: savedUser.first_name,
             last_name: savedUser.last_name,
           };
 
           res.cookie("refreshToken", refreshToken, COOKIE_OPTIONS);
-          return res.staus(200).json({ token, userInfo });
+          return res.status(200).json({ token, userInfo });
         } catch (error) {
-          res.status(500).json({ error });
+          return res.status(500).json({ error: "something went wrong" });
         }
-
-        res.status(500).json({ error });
       });
     } catch (error) {
-      console.log(error);
-
-      res.status(500).json({ error: error });
+      return res.status(500).json({ error: "something went wrong" });
     }
   },
 ];
@@ -110,7 +113,7 @@ exports.postLogIn = [
   (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(409).json({ errors });
+      return res.status(422).json({ errors });
     }
     next();
   },
