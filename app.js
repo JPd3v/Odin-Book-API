@@ -24,9 +24,10 @@ db.on("error", console.error.bind(console, "MongoDB connection error"));
 
 // Routes
 const userRoutes = require("./routes/user");
+const postsRoutes = require("./routes/posts");
 
-app.get("/", (req, res) => res.json({ response: "Hello World" }));
 app.use("/users", userRoutes);
+app.use("/posts", postsRoutes);
 
 const PORT = 3000;
 app.listen(PORT, () => console.log(`server listening in ${PORT}`));
