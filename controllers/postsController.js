@@ -4,10 +4,23 @@ const { body, validationResult } = require("express-validator");
 
 exports.getAllPosts = async (req, res) => {
   try {
-    const posts = await Posts.find({}).populate(
-      "creator",
-      "_id first_name last_name"
-    );
+    const posts = await Posts.find({})
+      .populate("creator", "_id first_name last_name")
+      .populate({
+        path: "comments",
+        populate: [
+          { path: "creator", select: "_id first_name last_name" },
+          {
+            path: "replies",
+            select: "creator edited likes timestamp content",
+            populate: {
+              path: "creator",
+              select: "_id first_name last_name",
+            },
+          },
+        ],
+      });
+
     return res.status(200).json(posts);
   } catch (error) {
     return res.status(500).json({ error: "something went wrong" });
@@ -73,7 +86,7 @@ exports.putPost = [
 
       return res
         .status(403)
-        .json({ error: "you dont have permission to do edit this comment" });
+        .json({ error: "you dont have permission to do edit this post" });
     } catch (error) {
       return res.status(500).json({ error: "something went wrong" });
     }
@@ -86,7 +99,7 @@ exports.deletePost = [
     try {
       const foundPost = await Posts.findById(req.params.id);
       if (!foundPost) {
-        return res.status(404).json({ message: "post not found" });
+        return res.status(404).json({ error: "post not found" });
       }
 
       if (foundPost.creator.toString() === req.user._id.toString()) {
@@ -97,7 +110,36 @@ exports.deletePost = [
 
       return res
         .status(403)
-        .json({ error: "you dont have permission to do delete this comment" });
+        .json({ error: "you dont have permission to do delete this post" });
+    } catch (error) {
+      return res.status(500).json({ error: "something went wrong" });
+    }
+  },
+];
+
+exports.postLike = [
+  verifyUser,
+  async (req, res) => {
+    try {
+      const foundPost = await Posts.findById(req.params.id);
+      if (!foundPost) {
+        return res.status(404).json({ error: "post not found" });
+      }
+
+      let userLikeIndex = foundPost.likes.findIndex(
+        (element) => element.toString() === req.user._id.toString()
+      );
+
+      if (userLikeIndex === -1) {
+        foundPost.likes.push(req.user._id);
+        await foundPost.save();
+        return res.status(200).json({ message: "like added" });
+      }
+
+      foundPost.likes.splice(userLikeIndex, 1);
+      await foundPost.save();
+
+      return res.status(200).json({ message: "like removed" });
     } catch (error) {
       return res.status(500).json({ error: "something went wrong" });
     }
