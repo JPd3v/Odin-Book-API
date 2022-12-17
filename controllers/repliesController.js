@@ -98,3 +98,32 @@ exports.deleteReply = [
     }
   },
 ];
+
+exports.postReplyLike = [
+  verifyUser,
+  async (req, res) => {
+    try {
+      const foundReply = await Replies.findById(req.params.id);
+      if (!foundReply) {
+        return res.status(404).json({ error: "reply not found" });
+      }
+
+      let userLikeIndex = foundReply.likes.findIndex(
+        (element) => element.toString() === req.user._id.toString()
+      );
+
+      if (userLikeIndex === -1) {
+        foundReply.likes.push(req.user._id);
+        await foundReply.save();
+        return res.status(200).json({ message: "like added" });
+      }
+
+      foundReply.likes.splice(userLikeIndex, 1);
+      await foundReply.save();
+
+      return res.status(200).json({ message: "like removed" });
+    } catch (error) {
+      return res.status(500).json({ error: "something went wrong" });
+    }
+  },
+];
