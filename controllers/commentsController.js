@@ -5,10 +5,18 @@ const { verifyUser } = require("../utils/authenticate");
 
 exports.getAllComments = async (req, res) => {
   try {
-    const allComments = await Comments.find().populate(
-      "creator",
-      "_id first_name last_name"
-    );
+    const allComments = await Comments.find()
+      .populate(
+        "creator replies",
+        "_id first_name last_name creator edited likes timestamp content"
+      )
+      .populate({
+        path: "replies",
+        populate: {
+          path: "creator",
+          select: "",
+        },
+      });
 
     return res.status(200).json(allComments);
   } catch (error) {
@@ -121,6 +129,35 @@ exports.deleteComment = [
       return res
         .status(403)
         .json({ error: "you dont have permission to do delete this comment" });
+    } catch (error) {
+      return res.status(500).json({ error: "something went wrong" });
+    }
+  },
+];
+
+exports.postCommentLike = [
+  verifyUser,
+  async (req, res) => {
+    try {
+      const foundComment = await Comments.findById(req.params.id);
+      if (!foundComment) {
+        return res.status(404).json({ error: "comment not found" });
+      }
+
+      let userLikeIndex = foundComment.likes.findIndex(
+        (element) => element.toString() === req.user._id.toString()
+      );
+
+      if (userLikeIndex === -1) {
+        foundComment.likes.push(req.user._id);
+        await foundComment.save();
+        return res.status(200).json({ message: "like added" });
+      }
+
+      foundComment.likes.splice(userLikeIndex, 1);
+      await foundComment.save();
+
+      return res.status(200).json({ message: "like removed" });
     } catch (error) {
       return res.status(500).json({ error: "something went wrong" });
     }
