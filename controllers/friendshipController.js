@@ -97,3 +97,46 @@ exports.acceptFriendshipRequest = [
     }
   },
 ];
+
+exports.cencelFriendshipRequest = [
+  verifyUser,
+  async (req, res) => {
+    const { requestId } = req.params;
+    try {
+      const foundUser = await Users.findById(requestId);
+
+      if (!foundUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      await Users.findByIdAndUpdate(requestId, {
+        $pull: { friend_requests: req.user._id },
+      });
+      return res
+        .status(200)
+        .json({ message: "friend request canceled successfully" });
+    } catch (error) {
+      return res.status(500).json({ error: "something went wrong" });
+    }
+  },
+];
+
+exports.declineFriendshipRequest = [
+  verifyUser,
+  async (req, res) => {
+    if (!req.user.friend_requests.includes(req.params.requestId)) {
+      return res.status(404).json({ error: "Friend request not found" });
+    }
+
+    try {
+      await Users.findByIdAndUpdate(req.user._id, {
+        $pull: { friend_requests: req.params.requestId },
+      });
+      return res
+        .status(200)
+        .json({ message: "friend request declined successfully" });
+    } catch (error) {
+      return res.status(500).json({ error: "something went wrong" });
+    }
+  },
+];
