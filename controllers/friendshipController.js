@@ -140,3 +140,40 @@ exports.declineFriendshipRequest = [
     }
   },
 ];
+
+exports.deleteFriend = [
+  verifyUser,
+  async (req, res) => {
+    const { requestId } = req.params;
+    const currentUserId = req.user._id;
+    try {
+      const foundSenderUser = await Users.findById(requestId);
+      const foundCurrentUser = await Users.findById(req.user._id);
+
+      if (!foundSenderUser) {
+        await Users.findByIdAndUpdate(req.user._id, {
+          $pull: { friend_list: requestId },
+        });
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const isFriend = foundCurrentUser.friend_list.includes(requestId);
+
+      if (!isFriend) {
+        return res.status(404).json({ error: "Friend not found" });
+      }
+
+      await Users.findByIdAndUpdate(req.user._id, {
+        $pull: { friend_list: requestId },
+      });
+
+      await Users.findByIdAndUpdate(requestId, {
+        $pull: { friend_list: currentUserId },
+      });
+
+      return res.status(200).json({ message: "friend deleted succefully" });
+    } catch (error) {
+      return res.status(500).json({ error: "something went wrong" });
+    }
+  },
+];

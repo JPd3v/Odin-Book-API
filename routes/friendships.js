@@ -10,5 +10,6 @@ router.put(
   "/:requestId/decline",
   friendshipController.declineFriendshipRequest
 );
+router.put("/:requestId/delete", friendshipController.deleteFriend);
 
 module.exports = router;
