@@ -27,11 +27,13 @@ const userRoutes = require("./routes/user");
 const postsRoutes = require("./routes/posts");
 const commentsRoutes = require("./routes/comment");
 const repliesRoutes = require("./routes/replies");
+const friendshipsRoutes = require("./routes/friendships");
 
 app.use("/users", userRoutes);
 app.use("/posts", postsRoutes);
 app.use("/comments", commentsRoutes);
 app.use("/replies", repliesRoutes);
+app.use("/friendships", friendshipsRoutes);
 
 const PORT = 3000;
 app.listen(PORT, () => console.log(`server listening in ${PORT}`));
