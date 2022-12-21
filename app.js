@@ -3,11 +3,29 @@ const express = require("express");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
+const cors = require("cors");
 
 require("./strategies/JwtStrategy");
 require("./strategies/LocalStrategy");
 
+//cors configuarion
+const whitelist = process.env.WHITELISTED_ORIGINS
+  ? process.env.WHITELISTED_ORIGINS
+  : [];
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin || whitelist.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  methods: "GET,PUT,POST,DELETE",
+  credentials: true,
+};
+
 const app = express();
+app.use(cors(corsOptions));
 
 app.use(bodyParser.json());
 app.use(cookieParser(process.env.COOKIE_SECRET));
