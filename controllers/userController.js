@@ -3,6 +3,26 @@ const bcrypt = require("bcryptjs");
 const { body, validationResult } = require("express-validator");
 const passport = require("passport");
 const jwt = require("jsonwebtoken");
+const multer = require("multer");
+const cloudinaryConfig = require("../config/cloudinaryconfig");
+const fs = require("node:fs/promises");
+
+const upload = multer({
+  dest: "./tmp",
+  fileFilter: (req, file, cb) => {
+    if (
+      file.mimetype == "image/png" ||
+      file.mimetype == "image/jpg" ||
+      file.mimetype == "image/jpeg"
+    ) {
+      cb(null, true);
+    } else {
+      cb(null, false);
+      return cb(new Error("Only .png, .jpg and .jpeg format allowed"));
+    }
+  },
+  limits: { fileSize: 3000000 }, // 3MB 3000000
+});
 
 const {
   COOKIE_OPTIONS,
@@ -31,11 +51,13 @@ exports.postSignUp = [
     .escape(),
   body("first_name", "first name must not be empty")
     .trim()
-    .isLength({ min: 1 })
+    .isLength({ min: 1, max: 15 })
+    .withMessage("First name cannot have more than 15 characters ")
     .escape(),
   body("last_name", "last name must not be empty")
     .trim()
-    .isLength({ min: 1 })
+    .isLength({ min: 1, max: 15 })
+    .withMessage("Last name cannot have more than 15 characters ")
     .escape(),
   body("gender", "gender must not be empty")
     .trim()
@@ -129,8 +151,12 @@ exports.postLogIn = [
       await foundUser.save();
 
       const userInfo = {
+        _id: foundUser._id,
         first_name: foundUser.first_name,
         last_name: foundUser.last_name,
+        profile_image: foundUser.profile_image.img,
+        friend_list: foundUser.friend_list,
+        friend_requests: foundUser.friend_requests,
       };
 
       res.cookie("refreshToken", refreshToken, COOKIE_OPTIONS);
@@ -162,29 +188,59 @@ exports.postLogOut = [
   },
 ];
 
-exports.getRefreshToken = async (req, res) => {
-  const refreshToken = req.signedCookies.refreshToken;
+(exports.getRefreshToken = verifyUser),
+  async (req, res) => {
+    const refreshToken = req.signedCookies.refreshToken;
 
-  if (refreshToken) {
-    try {
-      const payload = jwt.verify(
-        refreshToken,
-        process.env.REFRESH_TOKEN_SECRET
-      );
+    if (refreshToken) {
+      try {
+        const payload = jwt.verify(
+          refreshToken,
+          process.env.REFRESH_TOKEN_SECRET
+        );
 
-      const newToken = getToken({ _id: payload._id });
-      const newRefreshToken = getRefreshToken({ _id: payload._id });
+        const newToken = getToken({ _id: payload._id });
+        const newRefreshToken = getRefreshToken({ _id: payload._id });
 
-      const foundUser = await User.findById(payload._id);
-      foundUser.refresh_token = newRefreshToken;
+        const foundUser = await User.findById(payload._id);
+        foundUser.refresh_token = newRefreshToken;
 
-      await foundUser.save();
+        await foundUser.save();
 
-      res.cookie("refreshToken", newRefreshToken, COOKIE_OPTIONS);
-      return res.status(200).json({ token: newToken });
-    } catch (error) {
-      return res.status(500).json({ error: "something went wrong" });
+        res.cookie("refreshToken", newRefreshToken, COOKIE_OPTIONS);
+        return res.status(200).json({ token: newToken });
+      } catch (error) {
+        return res.status(500).json({ error: "something went wrong" });
+      }
     }
-  }
-  return res.status(401).json({ error: "unauthorized" });
-};
+    return res.status(401).json({ error: "unauthorized" });
+  };
+
+exports.editUserImage = [
+  verifyUser,
+  upload.single("profile_img"),
+  async (req, res) => {
+    try {
+      const file = req.file;
+      const savedImg = await cloudinaryConfig.uploader.upload(file.path);
+      await fs.unlink(file.path);
+      const saveUser = await User.findByIdAndUpdate(req.user._id, {
+        profile_image: { public_id: savedImg.public_id, img: savedImg.url },
+      });
+
+      // if users already have a profile image delete old image from cloud storage
+      req.user.profile_image.public_id
+        ? await cloudinaryConfig.uploader.destroy(
+            req.user.profile_image.public_id
+          )
+        : null;
+
+      return res.status(200).json({ img: saveUser });
+    } catch (error) {
+      return res.status(500).json({ error: "somethin went wrong" });
+    }
+  },
+  (error, req, res, next) => {
+    return res.status(422).json({ error: error.message });
+  },
+];
