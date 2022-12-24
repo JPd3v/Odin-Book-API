@@ -188,34 +188,32 @@ exports.postLogOut = [
   },
 ];
 
-(exports.getRefreshToken = verifyUser),
-  async (req, res) => {
-    const refreshToken = req.signedCookies.refreshToken;
+exports.getRefreshToken = async (req, res) => {
+  const refreshToken = req.signedCookies.refreshToken;
 
-    if (refreshToken) {
-      try {
-        const payload = jwt.verify(
-          refreshToken,
-          process.env.REFRESH_TOKEN_SECRET
-        );
+  if (refreshToken) {
+    try {
+      const payload = jwt.verify(
+        refreshToken,
+        process.env.REFRESH_TOKEN_SECRET
+      );
 
-        const newToken = getToken({ _id: payload._id });
-        const newRefreshToken = getRefreshToken({ _id: payload._id });
+      const newToken = getToken({ _id: payload._id });
+      const newRefreshToken = getRefreshToken({ _id: payload._id });
 
-        const foundUser = await User.findById(payload._id);
-        foundUser.refresh_token = newRefreshToken;
+      const foundUser = await User.findById(payload._id);
+      foundUser.refresh_token = newRefreshToken;
 
-        await foundUser.save();
+      await foundUser.save();
 
-        res.cookie("refreshToken", newRefreshToken, COOKIE_OPTIONS);
-        return res.status(200).json({ token: newToken });
-      } catch (error) {
-        return res.status(500).json({ error: "something went wrong" });
-      }
+      res.cookie("refreshToken", newRefreshToken, COOKIE_OPTIONS);
+      return res.status(200).json({ token: newToken });
+    } catch (error) {
+      return res.status(500).json({ error: "something went wrong" });
     }
-    return res.status(401).json({ error: "unauthorized" });
-  };
-
+  }
+  return res.status(401).json({ error: "unauthorized" });
+};
 exports.editUserImage = [
   verifyUser,
   upload.single("profile_img"),
