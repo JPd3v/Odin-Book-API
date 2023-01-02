@@ -3,6 +3,7 @@ const router = express.Router();
 
 const friendshipController = require("../controllers/friendshipController");
 
+router.get("/", friendshipController.getUserFriendships);
 router.post("/", friendshipController.postFriendshipRequest);
 router.put("/:requestId/accept", friendshipController.acceptFriendshipRequest);
 router.put("/:requestId/cancel", friendshipController.cencelFriendshipRequest);

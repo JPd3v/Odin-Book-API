@@ -2,6 +2,18 @@ const { body, validationResult } = require("express-validator");
 const { verifyUser } = require("../utils/authenticate");
 const Users = require("../models/user");
 
+exports.getUserFriendships = [
+  verifyUser,
+  (req, res) => {
+    const userFriendships = {
+      friend_list: req.user.friend_list,
+      friend_requests: req.user.friend_requests,
+    };
+
+    return res.status(200).json(userFriendships);
+  },
+];
+
 exports.postFriendshipRequest = [
   verifyUser,
   body("receptor_id", "receptor_id should be 24 characters long")
