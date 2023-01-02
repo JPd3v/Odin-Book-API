@@ -36,7 +36,10 @@ exports.postSignUp = [
     .trim()
     .isLength({ min: 1 })
     .escape()
-    .isEmail(),
+    .isEmail()
+    .withMessage(
+      "email provided not is a valid email address, example of valid email:example@example.com"
+    ),
   body("password", "password must not be empty")
     .trim()
     .isLength({ min: 8 })
@@ -63,12 +66,13 @@ exports.postSignUp = [
     .trim()
     .isLength({ min: 4 })
     .isIn(["male", "female", "other"])
+    .withMessage("gender provided is not valid")
     .escape(),
   body("birthday", "birthday must not be empty").trim().escape().isDate(),
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(422).json({ errors: errors.array() });
+      return res.status(422).json(errors);
     }
 
     try {
@@ -76,12 +80,12 @@ exports.postSignUp = [
         username: req.body.username,
       }).exec();
       if (foundUser) {
-        return res.status(403).json({ response: "Email already in use" });
+        return res.status(403).json({ message: "Email already in use" });
       }
 
       bcrypt.hash(req.body.password, 12, async (error, hashedPassword) => {
         if (error) {
-          return res.status(500).json({ error: "something went wrong" });
+          return res.status(500).json({ message: "something went wrong" });
         }
 
         const newUser = new User({
@@ -102,18 +106,20 @@ exports.postSignUp = [
           await savedUser.save();
 
           const userInfo = {
+            _id: savedUser._id,
             first_name: savedUser.first_name,
             last_name: savedUser.last_name,
+            profile_image: savedUser.profile_image.img,
           };
 
           res.cookie("refreshToken", refreshToken, COOKIE_OPTIONS);
           return res.status(200).json({ token, userInfo });
         } catch (error) {
-          return res.status(500).json({ error: "something went wrong" });
+          return res.status(500).json({ message: "something went wrong" });
         }
       });
     } catch (error) {
-      return res.status(500).json({ error: "something went wrong" });
+      return res.status(500).json({ message: "something went wrong" });
     }
   },
 ];
@@ -125,7 +131,7 @@ exports.postLogIn = [
     .escape()
     .isEmail()
     .withMessage(
-      "email provided not is a valid email address,example of valid email:example@example.com"
+      "email provided not is a valid email address, example of valid email:example@example.com"
     ),
   body("password", "password must not be empty")
     .trim()
@@ -135,12 +141,17 @@ exports.postLogIn = [
   (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(422).json({ errors });
+      return res.status(422).json(errors);
     }
     next();
   },
   passport.authenticate("local", { session: false, failWithError: true }),
   async (req, res) => {
+    if (req.body.error) {
+      const message = req.body.error;
+      return res.status(401).json(message);
+    }
+
     const refreshToken = getRefreshToken({ _id: req.user._id });
     const token = getToken({ _id: req.user._id });
 
@@ -155,18 +166,16 @@ exports.postLogIn = [
         first_name: foundUser.first_name,
         last_name: foundUser.last_name,
         profile_image: foundUser.profile_image.img,
-        friend_list: foundUser.friend_list,
-        friend_requests: foundUser.friend_requests,
       };
 
       res.cookie("refreshToken", refreshToken, COOKIE_OPTIONS);
       return res.status(200).json({ token, userInfo });
     } catch (error) {
-      res.status(500).json({ error });
+      res.status(500).json({ message: "something went wrong" });
     }
   },
   (err, req, res, next) => {
-    return res.status(401).send({ success: false, message: err });
+    return res.status(401).json({ message: "Incorrect username or password" });
   },
 ];
 
@@ -183,7 +192,7 @@ exports.postLogOut = [
       res.clearCookie("refreshToken", COOKIE_OPTIONS);
       return res.status(200).json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: "something went wrong" });
+      res.status(500).json({ message: "something went wrong" });
     }
   },
 ];
@@ -204,15 +213,22 @@ exports.getRefreshToken = async (req, res) => {
       const foundUser = await User.findById(payload._id);
       foundUser.refresh_token = newRefreshToken;
 
+      const userInfo = {
+        _id: foundUser._id,
+        first_name: foundUser.first_name,
+        last_name: foundUser.last_name,
+        profile_image: foundUser.profile_image.img,
+      };
+
       await foundUser.save();
 
       res.cookie("refreshToken", newRefreshToken, COOKIE_OPTIONS);
-      return res.status(200).json({ token: newToken });
+      return res.status(200).json({ token: newToken, userInfo });
     } catch (error) {
-      return res.status(500).json({ error: "something went wrong" });
+      return res.status(500).json({ message: "something went wrong" });
     }
   }
-  return res.status(401).json({ error: "unauthorized" });
+  return res.status(401).json({ message: "unauthorized" });
 };
 exports.editUserImage = [
   verifyUser,
@@ -235,10 +251,10 @@ exports.editUserImage = [
 
       return res.status(200).json({ img: saveUser });
     } catch (error) {
-      return res.status(500).json({ error: "somethin went wrong" });
+      return res.status(500).json({ message: "something went wrong" });
     }
   },
   (error, req, res, next) => {
-    return res.status(422).json({ error: error.message });
+    return res.status(422).json({ message: error.message });
   },
 ];
