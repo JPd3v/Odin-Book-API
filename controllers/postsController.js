@@ -27,6 +27,42 @@ exports.getAllPosts = async (req, res) => {
   }
 };
 
+exports.userFeedPosts = [
+  verifyUser,
+  async (req, res) => {
+    const { user } = req;
+
+    const currentPage = req.query.page - 1;
+    const postPerQuery = req.query.pageSize || 5;
+    const queryPage = postPerQuery * currentPage;
+
+    const mongoDBQuery = [...user.friend_list, user._id];
+
+    const posts = await Posts.find({ creator: { $in: mongoDBQuery } })
+      .sort({
+        timestamp: "desc",
+      })
+      .limit(postPerQuery)
+      .skip(queryPage)
+      .populate("creator", "_id first_name last_name profile_image")
+      .populate({
+        path: "comments",
+        populate: [
+          { path: "creator", select: "_id first_name last_name profile_image" },
+          {
+            path: "replies",
+            select: "creator edited likes timestamp content",
+            populate: {
+              path: "creator",
+              select: "_id first_name last_name profile_image",
+            },
+          },
+        ],
+      });
+    return res.status(200).json(posts);
+  },
+];
+
 exports.postPost = [
   verifyUser,
   body("content.text", "text cant be empty")
