@@ -47,6 +47,7 @@ exports.userFeedPosts = [
       .populate("creator", "_id first_name last_name profile_image")
       .populate({
         path: "comments",
+        options: { sort: { timestamp: "desc" } },
         populate: [
           { path: "creator", select: "_id first_name last_name profile_image" },
           {
