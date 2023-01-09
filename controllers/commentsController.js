@@ -20,7 +20,7 @@ exports.getAllComments = async (req, res) => {
 
     return res.status(200).json(allComments);
   } catch (error) {
-    return res.status(500).json({ error: "something went wrong" });
+    return res.status(500).json({ message: "something went wrong" });
   }
 };
 
@@ -31,12 +31,12 @@ exports.getSingleComment = async (req, res) => {
       "_id first_name last_name"
     );
     if (!foundComment) {
-      return res.status(404).json({ error: "comment not found" });
+      return res.status(404).json({ message: "comment not found" });
     }
 
     return res.status(200).json(foundComment);
   } catch (error) {
-    return res.status(500).json({ error: "something went wrong" });
+    return res.status(500).json({ message: "something went wrong" });
   }
 };
 
@@ -49,9 +49,9 @@ exports.postComment = [
       return res.status(422).json(errors);
     }
 
-    const postId = req.query.postId;
+    const postId = req.params.postId;
     if (!postId) {
-      return res.status(400).json({ error: "postId query string is required" });
+      return res.status(400).json({ message: "postId is required" });
     }
 
     try {
@@ -63,16 +63,18 @@ exports.postComment = [
 
       const foundPost = await Posts.findById(postId);
       if (!foundPost) {
-        return res.status(404).json({ error: "post not found" });
+        return res.status(404).json({ message: "post not found" });
       }
-      const savedComment = await newComment.save();
+      const savedComment = await (
+        await newComment.save()
+      ).populate("creator", "_id first_name last_name profile_image");
 
       foundPost.comments.push(savedComment._id);
       await foundPost.save();
 
-      return res.status(200).json({ new_comment: savedComment });
+      return res.status(200).json(savedComment);
     } catch (error) {
-      return res.status(500).json({ error: "something went wrong" });
+      return res.status(500).json({ message: "something went wrong" });
     }
   },
 ];
@@ -84,7 +86,7 @@ exports.putComment = [
     try {
       const foundComment = await Comments.findById(req.params.id);
       if (!foundComment) {
-        return res.status(404).json({ error: "comment not found" });
+        return res.status(404).json({ message: "comment not found" });
       }
 
       if (foundComment.creator.toString() === req.user._id.toString()) {
@@ -98,9 +100,9 @@ exports.putComment = [
 
       return res
         .status(403)
-        .json({ error: "you dont have permission to do edit this comment" });
+        .json({ message: "you dont have permission to do edit this comment" });
     } catch (error) {
-      return res.status(500).json({ error: "something went wrong" });
+      return res.status(500).json({ message: "something went wrong" });
     }
   },
 ];
@@ -113,7 +115,7 @@ exports.deleteComment = [
       const foundComment = await Comments.findById(commentId);
 
       if (!foundComment) {
-        return res.status(404).json({ error: "comment not found" });
+        return res.status(404).json({ message: "comment not found" });
       }
 
       if (foundComment.creator.toString() === req.user._id.toString()) {
@@ -128,9 +130,11 @@ exports.deleteComment = [
 
       return res
         .status(403)
-        .json({ error: "you dont have permission to do delete this comment" });
+        .json({
+          message: "you dont have permission to do delete this comment",
+        });
     } catch (error) {
-      return res.status(500).json({ error: "something went wrong" });
+      return res.status(500).json({ message: "something went wrong" });
     }
   },
 ];
@@ -141,7 +145,7 @@ exports.postCommentLike = [
     try {
       const foundComment = await Comments.findById(req.params.id);
       if (!foundComment) {
-        return res.status(404).json({ error: "comment not found" });
+        return res.status(404).json({ message: "comment not found" });
       }
 
       let userLikeIndex = foundComment.likes.findIndex(
@@ -159,7 +163,7 @@ exports.postCommentLike = [
 
       return res.status(200).json({ message: "like removed" });
     } catch (error) {
-      return res.status(500).json({ error: "something went wrong" });
+      return res.status(500).json({ message: "something went wrong" });
     }
   },
 ];
