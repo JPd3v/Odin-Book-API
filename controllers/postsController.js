@@ -23,7 +23,7 @@ exports.getAllPosts = async (req, res) => {
 
     return res.status(200).json(posts);
   } catch (error) {
-    return res.status(500).json({ error: "something went wrong" });
+    return res.status(500).json({ message: "something went wrong" });
   }
 };
 
@@ -86,7 +86,7 @@ exports.postPost = [
       const savedPost = await newPost.save();
       return res.status(200).json({ new_post: savedPost });
     } catch (error) {
-      return res.status(500).json({ error: "something went wrong" });
+      return res.status(500).json({ message: "something went wrong" });
     }
   },
 ];
@@ -110,7 +110,7 @@ exports.putPost = [
       const foundPost = await Posts.findById(postId);
 
       if (!foundPost) {
-        return res.status(404).json({ error: "post not found" });
+        return res.status(404).json({ message: "post not found" });
       }
 
       if (foundPost.creator.toString() === req.user._id.toString()) {
@@ -123,9 +123,9 @@ exports.putPost = [
 
       return res
         .status(403)
-        .json({ error: "you dont have permission to do edit this post" });
+        .json({ message: "you dont have permission to do edit this post" });
     } catch (error) {
-      return res.status(500).json({ error: "something went wrong" });
+      return res.status(500).json({ message: "something went wrong" });
     }
   },
 ];
@@ -136,7 +136,7 @@ exports.deletePost = [
     try {
       const foundPost = await Posts.findById(req.params.id);
       if (!foundPost) {
-        return res.status(404).json({ error: "post not found" });
+        return res.status(404).json({ message: "post not found" });
       }
 
       if (foundPost.creator.toString() === req.user._id.toString()) {
@@ -147,9 +147,9 @@ exports.deletePost = [
 
       return res
         .status(403)
-        .json({ error: "you dont have permission to do delete this post" });
+        .json({ message: "you dont have permission to do delete this post" });
     } catch (error) {
-      return res.status(500).json({ error: "something went wrong" });
+      return res.status(500).json({ message: "something went wrong" });
     }
   },
 ];
@@ -160,7 +160,7 @@ exports.postLike = [
     try {
       const foundPost = await Posts.findById(req.params.id);
       if (!foundPost) {
-        return res.status(404).json({ error: "post not found" });
+        return res.status(404).json({ message: "post not found" });
       }
 
       let userLikeIndex = foundPost.likes.findIndex(
@@ -178,7 +178,7 @@ exports.postLike = [
 
       return res.status(200).json({ message: "like removed" });
     } catch (error) {
-      return res.status(500).json({ error: "something went wrong" });
+      return res.status(500).json({ message: "something went wrong" });
     }
   },
 ];
