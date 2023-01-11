@@ -19,7 +19,7 @@ exports.postReply = [
     try {
       const parentComment = await Comments.findById(req.params.commentId);
       if (!parentComment) {
-        return res.status(404).json({ error: "comment not found" });
+        return res.status(404).json({ message: "comment not found" });
       }
       const newReply = new Replies({
         creator: req.user._id,
@@ -28,12 +28,14 @@ exports.postReply = [
         comment_id: parentComment._id,
       });
 
-      const savedNewreply = await newReply.save();
+      const savedNewreply = await (
+        await newReply.save()
+      ).populate("creator", "_id first_name last_name profile_image");
       parentComment.replies.push(savedNewreply._id);
       await parentComment.save();
-      return res.status(200).json({ saved_reply: savedNewreply });
+      return res.status(200).json(savedNewreply);
     } catch (error) {
-      return res.status(500).json({ error: "something went wrong" });
+      return res.status(500).json({ message: "something went wrong" });
     }
   },
 ];
@@ -54,7 +56,7 @@ exports.putReply = [
     try {
       const foundReply = await Replies.findById(req.params.replyId);
       if (!foundReply) {
-        return res.status(404).json({ error: "reply not found" });
+        return res.status(404).json({ message: "reply not found" });
       }
 
       if (foundReply.creator.toString() === req.user._id.toString()) {
@@ -66,9 +68,9 @@ exports.putReply = [
       }
       return res
         .status(403)
-        .json({ error: "you dont have permission to do edit this reply" });
+        .json({ message: "you dont have permission to do edit this reply" });
     } catch (error) {
-      return res.status(500).json({ error: "something went wrong" });
+      return res.status(500).json({ message: "something went wrong" });
     }
   },
 ];
@@ -79,7 +81,7 @@ exports.deleteReply = [
     try {
       const foundReply = await Replies.findById(req.params.replyId);
       if (!foundReply) {
-        return res.status(404).json({ error: "reply not found" });
+        return res.status(404).json({ message: "reply not found" });
       }
 
       if (foundReply.creator.toString() === req.user._id.toString()) {
@@ -92,9 +94,9 @@ exports.deleteReply = [
 
       return res
         .status(403)
-        .json({ error: "you dont have permission to do delete this reply" });
+        .json({ message: "you dont have permission to do delete this reply" });
     } catch (error) {
-      return res.status(500).json({ error: "something went wrong" });
+      return res.status(500).json({ message: "something went wrong" });
     }
   },
 ];
@@ -105,7 +107,7 @@ exports.postReplyLike = [
     try {
       const foundReply = await Replies.findById(req.params.id);
       if (!foundReply) {
-        return res.status(404).json({ error: "reply not found" });
+        return res.status(404).json({ message: "reply not found" });
       }
 
       let userLikeIndex = foundReply.likes.findIndex(
@@ -123,7 +125,7 @@ exports.postReplyLike = [
 
       return res.status(200).json({ message: "like removed" });
     } catch (error) {
-      return res.status(500).json({ error: "something went wrong" });
+      return res.status(500).json({ message: "something went wrong" });
     }
   },
 ];
