@@ -170,13 +170,13 @@ exports.postLike = [
       if (userLikeIndex === -1) {
         foundPost.likes.push(req.user._id);
         await foundPost.save();
-        return res.status(200).json({ message: "like added" });
+        return res.status(200).json(foundPost.likes);
       }
 
       foundPost.likes.splice(userLikeIndex, 1);
       await foundPost.save();
 
-      return res.status(200).json({ message: "like removed" });
+      return res.status(200).json(foundPost.likes);
     } catch (error) {
       return res.status(500).json({ message: "something went wrong" });
     }
