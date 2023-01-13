@@ -128,11 +128,9 @@ exports.deleteComment = [
         return res.status(200).json({ message: "comment deleted succefully" });
       }
 
-      return res
-        .status(403)
-        .json({
-          message: "you dont have permission to do delete this comment",
-        });
+      return res.status(403).json({
+        message: "you dont have permission to do delete this comment",
+      });
     } catch (error) {
       return res.status(500).json({ message: "something went wrong" });
     }
@@ -155,13 +153,13 @@ exports.postCommentLike = [
       if (userLikeIndex === -1) {
         foundComment.likes.push(req.user._id);
         await foundComment.save();
-        return res.status(200).json({ message: "like added" });
+        return res.status(200).json(foundComment.likes);
       }
 
       foundComment.likes.splice(userLikeIndex, 1);
       await foundComment.save();
 
-      return res.status(200).json({ message: "like removed" });
+      return res.status(200).json(foundComment.likes);
     } catch (error) {
       return res.status(500).json({ message: "something went wrong" });
     }
