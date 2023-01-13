@@ -52,7 +52,7 @@ exports.userFeedPosts = [
           { path: "creator", select: "_id first_name last_name profile_image" },
           {
             path: "replies",
-            select: "creator edited likes timestamp content",
+            select: "",
             populate: {
               path: "creator",
               select: "_id first_name last_name profile_image",
