@@ -42,7 +42,7 @@ exports.postReply = [
 
 exports.putReply = [
   verifyUser,
-  body("reply_text", "reply text cant be empty")
+  body("content.text", "reply text cant be empty")
     .trim()
     .isLength({ min: 1 })
     .escape(),
@@ -60,7 +60,7 @@ exports.putReply = [
       }
 
       if (foundReply.creator.toString() === req.user._id.toString()) {
-        foundReply.content.text = req.body.reply_text;
+        foundReply.content.text = req.body.content.text;
         foundReply.edited = true;
 
         const saveReply = await foundReply.save();

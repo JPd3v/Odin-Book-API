@@ -81,7 +81,7 @@ exports.postComment = [
 
 exports.putComment = [
   verifyUser,
-  body("comment_text").trim().isLength({ min: 1 }).escape(),
+  body("content.text").trim().isLength({ min: 1 }).escape(),
   async (req, res) => {
     try {
       const foundComment = await Comments.findById(req.params.id);
@@ -90,7 +90,7 @@ exports.putComment = [
       }
 
       if (foundComment.creator.toString() === req.user._id.toString()) {
-        foundComment.content.text = req.body.comment_text;
+        foundComment.content.text = req.body.content.text;
         foundComment.edited = true;
 
         const saveEditedComment = await foundComment.save();
