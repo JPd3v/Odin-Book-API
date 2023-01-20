@@ -8,5 +8,6 @@ router.post("/log-in", userController.postLogIn);
 router.post("/log-out", userController.postLogOut);
 router.get("/refresh-token", userController.getRefreshToken);
 router.put("/edit-image", userController.editUserImage);
+router.get("/recommended-friends", userController.recommendedFriends);
 
 module.exports = router;

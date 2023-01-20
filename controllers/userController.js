@@ -30,6 +30,7 @@ const {
   getRefreshToken,
   verifyUser,
 } = require("../utils/authenticate");
+const user = require("../models/user");
 
 exports.postSignUp = [
   body("username", "email must not be empty")
@@ -256,5 +257,26 @@ exports.editUserImage = [
   },
   (error, req, res, next) => {
     return res.status(422).json({ message: error.message });
+  },
+];
+
+exports.recommendedFriends = [
+  verifyUser,
+  async (req, res) => {
+    const responseLimit = req.query.pagesize ?? 5;
+    try {
+      const recommendedFriends = await user
+        .find({
+          _id: { $ne: req.user._id },
+          friend_list: { $ne: req.user._id },
+          friend_requests: { $ne: req.user._id },
+        })
+        .limit(responseLimit)
+        .select("profile_image _id first_name last_name");
+
+      return res.status(200).json(recommendedFriends);
+    } catch (error) {
+      return res.status(500).json({ message: "something went wrong" });
+    }
   },
 ];
