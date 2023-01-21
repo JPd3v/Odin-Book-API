@@ -280,3 +280,24 @@ exports.recommendedFriends = [
     }
   },
 ];
+
+exports.getUserInfo = [
+  verifyUser,
+  async (req, res) => {
+    const { userId } = req.params;
+    try {
+      const foundUser = await user
+        .findById(userId)
+        .select("-creation_date -password -username")
+        .populate("friend_list", "_id profile_image  first_name last_name");
+
+      if (!foundUser) {
+        return res.status(404).json({ message: "user not found" });
+      }
+
+      return res.status(200).json(foundUser);
+    } catch (error) {
+      return res.status(500).json({ message: "something went wrong" });
+    }
+  },
+];

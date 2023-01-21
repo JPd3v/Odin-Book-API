@@ -9,5 +9,6 @@ router.post("/log-out", userController.postLogOut);
 router.get("/refresh-token", userController.getRefreshToken);
 router.put("/edit-image", userController.editUserImage);
 router.get("/recommended-friends", userController.recommendedFriends);
+router.get("/:userId", userController.getUserInfo);
 
 module.exports = router;
