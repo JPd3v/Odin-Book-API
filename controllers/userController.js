@@ -271,7 +271,7 @@ exports.recommendedFriends = [
           friend_requests: { $ne: req.user._id },
           $and: [
             { _id: { $ne: req.user._id } },
-            { _id: { $ne: req.user.friend_requests } },
+            { _id: { $nin: req.user.friend_requests } },
           ],
         })
         .limit(responseLimit)
