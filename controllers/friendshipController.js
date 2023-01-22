@@ -41,29 +41,39 @@ exports.postFriendshipRequest = [
         req.user._id
       );
 
+      const userAlreadyHaveRequestFromReceptor =
+        req.user.friend_requests.includes(foundReceptor._id);
+
       if (userIsAlreadyfriend) {
         return res.status(409).json({
-          error: "Cant send friend request because users are already friends",
+          error: "Can't send friend request because users are already friends",
         });
       }
 
       if (foundReceptor._id.toString() === req.user._id.toString()) {
         return res.status(409).json({
-          error: "Cant send friend request to yourself",
+          error: "Can't send friend request to yourself",
         });
       }
 
-      if (!userRequestAlreadyExists) {
-        foundReceptor.friend_requests.unshift(req.user._id);
-        await foundReceptor.save();
+      if (userRequestAlreadyExists) {
         return res
-          .status(200)
-          .json({ message: "Friend request sent successfully" });
+          .status(409)
+          .json({ error: "User already have a friend request from you" });
       }
 
+      if (userAlreadyHaveRequestFromReceptor) {
+        return res.status(409).json({
+          error:
+            "Can't send friend request because you already have a friend request from this user",
+        });
+      }
+
+      foundReceptor.friend_requests.unshift(req.user._id);
+      await foundReceptor.save();
       return res
-        .status(409)
-        .json({ error: "User already have a friend request from you" });
+        .status(200)
+        .json({ message: "Friend request sent successfully" });
     } catch (error) {
       return res.status(500).json({ error: "something went wrong" });
     }
