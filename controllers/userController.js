@@ -267,9 +267,12 @@ exports.recommendedFriends = [
     try {
       const recommendedFriends = await user
         .find({
-          _id: { $ne: req.user._id },
           friend_list: { $ne: req.user._id },
           friend_requests: { $ne: req.user._id },
+          $and: [
+            { _id: { $ne: req.user._id } },
+            { _id: { $ne: req.user.friend_requests } },
+          ],
         })
         .limit(responseLimit)
         .select("profile_image _id first_name last_name");
