@@ -111,6 +111,7 @@ exports.postSignUp = [
             first_name: savedUser.first_name,
             last_name: savedUser.last_name,
             profile_image: savedUser.profile_image.img,
+            friend_requests: foundUser.friend_requests,
           };
 
           res.cookie("refreshToken", refreshToken, COOKIE_OPTIONS);
@@ -167,6 +168,7 @@ exports.postLogIn = [
         first_name: foundUser.first_name,
         last_name: foundUser.last_name,
         profile_image: foundUser.profile_image.img,
+        friend_requests: foundUser.friend_requests,
       };
 
       res.cookie("refreshToken", refreshToken, COOKIE_OPTIONS);
@@ -213,12 +215,12 @@ exports.getRefreshToken = async (req, res) => {
 
       const foundUser = await User.findById(payload._id);
       foundUser.refresh_token = newRefreshToken;
-
       const userInfo = {
         _id: foundUser._id,
         first_name: foundUser.first_name,
         last_name: foundUser.last_name,
         profile_image: foundUser.profile_image.img,
+        friend_requests: foundUser.friend_requests,
       };
 
       await foundUser.save();
