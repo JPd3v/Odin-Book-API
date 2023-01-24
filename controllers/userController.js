@@ -57,11 +57,13 @@ exports.postSignUp = [
     .trim()
     .isLength({ min: 1, max: 15 })
     .withMessage("First name cannot have more than 15 characters ")
+    .blacklist(" ")
     .escape(),
   body("last_name", "last name must not be empty")
     .trim()
     .isLength({ min: 1, max: 15 })
     .withMessage("Last name cannot have more than 15 characters ")
+    .blacklist(" ")
     .escape(),
   body("gender", "gender must not be empty")
     .trim()
@@ -89,6 +91,9 @@ exports.postSignUp = [
           return res.status(500).json({ message: "something went wrong" });
         }
 
+        const initials = `${req.body.first_name[0]}${req.body.last_name[0]}`;
+        const userDefaultImage = `https://api.dicebear.com/5.x/initials/svg?seed=${initials}`;
+
         const newUser = new User({
           username: req.body.username,
           password: hashedPassword,
@@ -96,6 +101,7 @@ exports.postSignUp = [
           last_name: req.body.last_name,
           gender: req.body.gender,
           birthday: req.body.birthday,
+          profile_image: { img: userDefaultImage },
         });
         try {
           const savedUser = await newUser.save();
@@ -111,7 +117,7 @@ exports.postSignUp = [
             first_name: savedUser.first_name,
             last_name: savedUser.last_name,
             profile_image: savedUser.profile_image.img,
-            friend_requests: foundUser.friend_requests,
+            friend_requests: savedUser.friend_requests,
           };
 
           res.cookie("refreshToken", refreshToken, COOKIE_OPTIONS);
