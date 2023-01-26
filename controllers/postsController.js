@@ -27,40 +27,89 @@ exports.getAllPosts = async (req, res) => {
   }
 };
 
-exports.userFeedPosts = [
+exports.userFeed = [
   verifyUser,
   async (req, res) => {
     const { user } = req;
+    try {
+      const currentPage = req.query.page - 1;
+      const postPerQuery = req.query.pageSize || 5;
+      const queryPage = postPerQuery * currentPage;
 
-    const currentPage = req.query.page - 1;
-    const postPerQuery = req.query.pageSize || 5;
-    const queryPage = postPerQuery * currentPage;
+      const mongoDBQuery = [...user.friend_list, user._id];
 
-    const mongoDBQuery = [...user.friend_list, user._id];
-
-    const posts = await Posts.find({ creator: { $in: mongoDBQuery } })
-      .sort({
-        timestamp: "desc",
-      })
-      .limit(postPerQuery)
-      .skip(queryPage)
-      .populate("creator", "_id first_name last_name profile_image")
-      .populate({
-        path: "comments",
-        options: { sort: { timestamp: "desc" } },
-        populate: [
-          { path: "creator", select: "_id first_name last_name profile_image" },
-          {
-            path: "replies",
-            select: "",
-            populate: {
+      const posts = await Posts.find({ creator: { $in: mongoDBQuery } })
+        .sort({
+          timestamp: "desc",
+        })
+        .limit(postPerQuery)
+        .skip(queryPage)
+        .populate("creator", "_id first_name last_name profile_image")
+        .populate({
+          path: "comments",
+          options: { sort: { timestamp: "desc" } },
+          populate: [
+            {
               path: "creator",
               select: "_id first_name last_name profile_image",
             },
-          },
-        ],
-      });
-    return res.status(200).json(posts);
+            {
+              path: "replies",
+              select: "",
+              populate: {
+                path: "creator",
+                select: "_id first_name last_name profile_image",
+              },
+            },
+          ],
+        });
+
+      return res.status(200).json(posts);
+    } catch (error) {
+      return res.status(500).json({ message: "something went wrong" });
+    }
+  },
+];
+
+exports.userPosts = [
+  verifyUser,
+  async (req, res) => {
+    const user = req.params.userId;
+
+    try {
+      const currentPage = req.query.page - 1;
+      const postPerQuery = req.query.pageSize || 5;
+      const queryPage = postPerQuery * currentPage;
+
+      const posts = await Posts.find({ creator: user })
+        .sort({
+          timestamp: "desc",
+        })
+        .limit(postPerQuery)
+        .skip(queryPage)
+        .populate("creator", "_id first_name last_name profile_image")
+        .populate({
+          path: "comments",
+          options: { sort: { timestamp: "desc" } },
+          populate: [
+            {
+              path: "creator",
+              select: "_id first_name last_name profile_image",
+            },
+            {
+              path: "replies",
+              select: "",
+              populate: {
+                path: "creator",
+                select: "_id first_name last_name profile_image",
+              },
+            },
+          ],
+        });
+      return res.status(200).json(posts);
+    } catch (error) {
+      return res.status(500).json({ message: "something went wrong" });
+    }
   },
 ];
 
