@@ -17,7 +17,7 @@ const userSchema = new Schema({
   gender: { type: String, enum: ["male", "female", "other"] },
   birthday: { type: String, required: true },
   refresh_token: { type: String, default: "" },
-  friend_requests: [{ type: Schema.Types.ObjectId, ref: "User" }],
+  friend_requests: [{ type: Schema.Types.ObjectId, ref: "Users" }],
   friend_list: [{ type: Schema.Types.ObjectId, ref: "Users" }],
 });
 

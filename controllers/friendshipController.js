@@ -10,7 +10,7 @@ exports.getUserFriendships = [
       friend_requests: req.user.friend_requests,
     };
 
-    return res.status(200).json(userFriendships);
+    return res.status(200).json({ userFriendships: 2 });
   },
 ];
 

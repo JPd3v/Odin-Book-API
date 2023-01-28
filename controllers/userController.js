@@ -312,3 +312,201 @@ exports.getUserInfo = [
     }
   },
 ];
+
+exports.userFriendRequests = [
+  verifyUser,
+  async (req, res) => {
+    const userId = req.params.userId;
+
+    try {
+      const foundUser = await User.findById(userId)
+        .select("friend_requests")
+        .populate("friend_requests", "profile_image first_name last_name");
+      if (!foundUser) {
+        return res.status(404).json({ message: "user not found" });
+      }
+
+      const friendRequests = foundUser.friend_requests;
+
+      return res.status(200).json(friendRequests);
+    } catch (error) {
+      return res.status(500).json({ message: "something went wrong" });
+    }
+  },
+];
+
+exports.acceptFriendRequest = [
+  verifyUser,
+  async (req, res) => {
+    const { requestId } = req.params;
+    try {
+      const foundSenderUser = await User.findById(requestId);
+      const foundCurrentUser = await User.findById(req.user._id);
+
+      if (!foundSenderUser) {
+        await User.findByIdAndUpdate(req.user._id, {
+          $pull: { friend_requests: requestId },
+        });
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const friendRequestExist =
+        foundCurrentUser.friend_requests.includes(requestId);
+
+      if (!friendRequestExist) {
+        return res.status(404).json({ error: "Friend request not found" });
+      }
+
+      const updatedFriendRequests = foundCurrentUser.friend_requests.filter(
+        (element) => element.toString() !== req.params.requestId.toString()
+      );
+
+      foundCurrentUser.friend_requests = updatedFriendRequests;
+      foundCurrentUser.friend_list.push(requestId);
+      foundSenderUser.friend_list.push(req.user._id);
+
+      await foundCurrentUser.save();
+      await foundSenderUser.save();
+
+      return res.status(200).json({ message: "friend added succefully" });
+    } catch (error) {
+      return res.status(500).json({ error: "something went wrong" });
+    }
+  },
+];
+
+exports.cancelFriendRequest = [
+  verifyUser,
+  async (req, res) => {
+    const { requestId } = req.params;
+    try {
+      const foundUser = await User.findById(requestId);
+
+      if (!foundUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      await User.findByIdAndUpdate(requestId, {
+        $pull: { friend_requests: req.user._id },
+      });
+      return res
+        .status(200)
+        .json({ message: "friend request canceled successfully" });
+    } catch (error) {
+      return res.status(500).json({ error: "something went wrong" });
+    }
+  },
+];
+
+exports.declineFriendRequest = [
+  verifyUser,
+  async (req, res) => {
+    if (!req.user.friend_requests.includes(req.params.requestId)) {
+      return res.status(404).json({ error: "Friend request not found" });
+    }
+
+    try {
+      await User.findByIdAndUpdate(req.user._id, {
+        $pull: { friend_requests: req.params.requestId },
+      });
+      return res
+        .status(200)
+        .json({ message: "friend request declined successfully" });
+    } catch (error) {
+      return res.status(500).json({ error: "something went wrong" });
+    }
+  },
+];
+
+exports.deleteFriend = [
+  verifyUser,
+  async (req, res) => {
+    const { requestId } = req.params;
+    const currentUserId = req.user._id;
+    try {
+      const foundSenderUser = await User.findById(requestId);
+      const foundCurrentUser = await User.findById(req.user._id);
+
+      if (!foundSenderUser) {
+        await User.findByIdAndUpdate(req.user._id, {
+          $pull: { friend_list: requestId },
+        });
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const isFriend = foundCurrentUser.friend_list.includes(requestId);
+
+      if (!isFriend) {
+        return res.status(404).json({ error: "Friend not found" });
+      }
+
+      await User.findByIdAndUpdate(req.user._id, {
+        $pull: { friend_list: requestId },
+      });
+
+      await User.findByIdAndUpdate(requestId, {
+        $pull: { friend_list: currentUserId },
+      });
+
+      return res.status(200).json({ message: "friend deleted succefully" });
+    } catch (error) {
+      return res.status(500).json({ error: "something went wrong" });
+    }
+  },
+];
+
+exports.sendFriendRequest = [
+  verifyUser,
+  async (req, res) => {
+    try {
+      const foundReceptor = await User.findById(req.params.userId);
+      if (!foundReceptor) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const userIsAlreadyfriend = foundReceptor.friend_list.includes(
+        req.user._id
+      );
+
+      const userRequestAlreadyExists = foundReceptor.friend_requests.includes(
+        req.user._id
+      );
+
+      const userAlreadyHaveRequestFromReceptor =
+        req.user.friend_requests.includes(foundReceptor._id);
+
+      if (userIsAlreadyfriend) {
+        return res.status(409).json({
+          error: "Can't send friend request because users are already friends",
+        });
+      }
+
+      if (foundReceptor._id.toString() === req.user._id.toString()) {
+        return res.status(409).json({
+          error: "Can't send friend request to yourself",
+        });
+      }
+
+      if (userRequestAlreadyExists) {
+        return res
+          .status(409)
+          .json({ error: "User already have a friend request from you" });
+      }
+
+      if (userAlreadyHaveRequestFromReceptor) {
+        return res.status(409).json({
+          error:
+            "Can't send friend request because you already have a friend request from this user",
+        });
+      }
+
+      foundReceptor.friend_requests.unshift(req.user._id);
+      await foundReceptor.save();
+      return res
+        .status(200)
+        .json({ message: "Friend request sent successfully" });
+    } catch (error) {
+      return res.status(500).json({ error: "something went wrong" });
+    }
+  },
+];
