@@ -231,3 +231,37 @@ exports.postLike = [
     }
   },
 ];
+
+exports.getPost = [
+  verifyUser,
+  async (req, res) => {
+    try {
+      const foundPost = await Posts.findById(req.params.postId)
+        .populate("creator", "_id first_name last_name profile_image")
+        .populate({
+          path: "comments",
+          options: { sort: { timestamp: "desc" } },
+          populate: [
+            {
+              path: "creator",
+              select: "_id first_name last_name profile_image",
+            },
+            {
+              path: "replies",
+              select: "",
+              populate: {
+                path: "creator",
+                select: "_id first_name last_name profile_image",
+              },
+            },
+          ],
+        });
+      if (!foundPost) {
+        return res.status(404).json({ message: "post not found" });
+      }
+      return res.status(200).json(foundPost);
+    } catch (error) {
+      return res.status(500).json({ message: "something went wrong" });
+    }
+  },
+];
