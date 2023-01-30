@@ -1,6 +1,6 @@
 const User = require("../models/user");
 const bcrypt = require("bcryptjs");
-const { body, validationResult } = require("express-validator");
+const { body, validationResult, query } = require("express-validator");
 const passport = require("passport");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
@@ -507,6 +507,38 @@ exports.sendFriendRequest = [
         .json({ message: "Friend request sent successfully" });
     } catch (error) {
       return res.status(500).json({ error: "something went wrong" });
+    }
+  },
+];
+
+exports.search = [
+  verifyUser,
+
+  async (req, res) => {
+    const { query } = req;
+
+    const firstName = query.firstName;
+    const lastName = query.lastName;
+    const currentPage = query.page - 1;
+    const pageSize = query.pageSize || 5;
+    const skipPage = pageSize * currentPage;
+
+    const firstNameRegex = new RegExp(`^${firstName}\\B`, "i");
+    const LastNameRegex = new RegExp(`^${lastName}\\B`, "i");
+
+    const mongoDBQuery = {};
+    firstName ? (mongoDBQuery.first_name = firstNameRegex) : null;
+    lastName ? (mongoDBQuery.last_name = LastNameRegex) : null;
+
+    try {
+      const foundUsers = await User.find(mongoDBQuery)
+        .limit(pageSize)
+        .skip(skipPage)
+        .select("profile_image _id first_name last_name");
+
+      return res.status(200).json(foundUsers);
+    } catch (error) {
+      return res.status(500).json({ message: "something went wrong" });
     }
   },
 ];
