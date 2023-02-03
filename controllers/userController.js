@@ -523,8 +523,8 @@ exports.search = [
     const pageSize = query.pageSize || 5;
     const skipPage = pageSize * currentPage;
 
-    const firstNameRegex = new RegExp(`^${firstName}\\B`, "i");
-    const LastNameRegex = new RegExp(`^${lastName}\\B`, "i");
+    const firstNameRegex = new RegExp(`^${firstName}`, "i");
+    const LastNameRegex = new RegExp(`^${lastName}`, "i");
 
     const mongoDBQuery = {};
     firstName ? (mongoDBQuery.first_name = firstNameRegex) : null;
