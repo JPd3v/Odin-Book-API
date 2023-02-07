@@ -117,7 +117,9 @@ exports.postSignUp = [
             first_name: savedUser.first_name,
             last_name: savedUser.last_name,
             profile_image: savedUser.profile_image.img,
-            friend_requests: savedUser.friend_requests,
+            gender: savedUser.gender,
+            email: savedUser.username,
+            birthday: savedUser.birthday,
           };
 
           res.cookie("refreshToken", refreshToken, COOKIE_OPTIONS);
@@ -174,7 +176,9 @@ exports.postLogIn = [
         first_name: foundUser.first_name,
         last_name: foundUser.last_name,
         profile_image: foundUser.profile_image.img,
-        friend_requests: foundUser.friend_requests,
+        email: foundUser.username,
+        gender: foundUser.gender,
+        birthday: foundUser.birthday,
       };
 
       res.cookie("refreshToken", refreshToken, COOKIE_OPTIONS);
@@ -226,7 +230,9 @@ exports.getRefreshToken = async (req, res) => {
         first_name: foundUser.first_name,
         last_name: foundUser.last_name,
         profile_image: foundUser.profile_image.img,
-        friend_requests: foundUser.friend_requests,
+        email: foundUser.username,
+        gender: foundUser.gender,
+        birthday: foundUser.birthday,
       };
 
       await foundUser.save();
@@ -250,7 +256,6 @@ exports.editUserImage = [
       const saveUser = await User.findByIdAndUpdate(req.user._id, {
         profile_image: { public_id: savedImg.public_id, img: savedImg.url },
       });
-
       // if users already have a profile image delete old image from cloud storage
       req.user.profile_image.public_id
         ? await cloudinaryConfig.uploader.destroy(
@@ -258,13 +263,167 @@ exports.editUserImage = [
           )
         : null;
 
-      return res.status(200).json({ img: saveUser });
+      return res.status(200).json(savedImg.url);
     } catch (error) {
       return res.status(500).json({ message: "something went wrong" });
     }
   },
   (error, req, res, next) => {
     return res.status(422).json({ message: error.message });
+  },
+];
+
+exports.editUserInfo = [
+  verifyUser,
+  body("newUsername")
+    .trim()
+    .optional()
+    .isLength({ min: 1 })
+    .escape()
+    .isEmail()
+    .withMessage(
+      "Email provided not is a valid email address, example of valid email:example@example.com"
+    )
+    .custom((_value, { req }) => (req.body.confirmNewUsername ? true : false))
+    .withMessage("Confirm new email is required"),
+  body("confirmNewUsername")
+    .trim()
+    .isLength({ min: 1 })
+    .optional()
+    .custom((value, { req }) => value === req.body.newUsername)
+    .withMessage(
+      "Confirm new email and new email field must have the same value"
+    )
+    .custom(async (value) => {
+      try {
+        const foundEmail = await User.findOne({ username: value });
+        if (foundEmail) {
+          return Promise.reject("Email already in use");
+        }
+        return true;
+      } catch (error) {
+        return Promise.reject("Something went wrong");
+      }
+    })
+    .escape(),
+  body("password")
+    .trim()
+    .optional()
+    .isLength({ min: 8 })
+    .custom(async (value, { req }) => {
+      try {
+        const passwordVerify = await bcrypt.compare(value, req.user.password);
+        if (passwordVerify) {
+          return true;
+        }
+        return Promise.reject("Account current password is incorrect");
+      } catch (error) {
+        return Promise.reject("Something went wrong");
+      }
+    })
+    .escape(),
+  body(
+    "newPassword",
+    "confirm new password and new password field must have the same value"
+  )
+    .trim()
+    .isLength({ min: 8 })
+    .optional()
+    .custom((_value, { req }) => (req.body.confirmNewPassword ? true : false))
+    .withMessage("Confirm new password is required")
+    .escape(),
+  body(
+    "confirmNewPassword",
+    "confirm new password and new password field must have the same value"
+  )
+    .trim()
+    .isLength({ min: 8 })
+    .optional()
+    .custom((value, { req }) => value === req.body.newPassword)
+    .escape(),
+  body("firstName", "first name must not be empty")
+    .trim()
+    .isLength({ min: 1, max: 15 })
+    .optional()
+    .withMessage("First name cannot have more than 15 characters ")
+    .blacklist(" ")
+    .escape(),
+  body("lastName", "last name must not be empty")
+    .trim()
+    .optional()
+    .isLength({ min: 1, max: 15 })
+    .withMessage("Last name cannot have more than 15 characters ")
+    .blacklist(" ")
+    .escape(),
+  body("gender", "gender must not be empty")
+    .trim()
+    .optional()
+    .isLength({ min: 4 })
+    .isIn(["male", "female", "other"])
+    .withMessage("gender provided is not valid")
+    .escape(),
+  body("birthday", "birthday must not be empty")
+    .trim()
+    .optional()
+    .escape()
+    .isDate(),
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(422).json(errors);
+    }
+
+    const { user, body } = req;
+
+    try {
+      const findUser = await User.findById(user._id);
+
+      if (!body.newPassword) {
+        const editedUser = {};
+        body.newUsername ? (editedUser.username = body.newUsername) : null;
+        body.firstName ? (editedUser.first_name = body.firstName) : null;
+        body.lastName ? (editedUser.last_name = body.lastName) : null;
+        body.gender ? (editedUser.gender = body.gender) : null;
+        body.birthday ? (editedUser.birthday = body.birthday) : null;
+        const newUser = { ...findUser.toObject(), ...editedUser };
+
+        const updatedUser = await User.findByIdAndUpdate(
+          user._id,
+          {
+            ...newUser,
+          },
+          { returnDocument: "after" }
+        ).select("-password -friend_requests -friend_list -creation_date -__v");
+
+        return res.status(200).json({ updatedUser });
+      }
+
+      bcrypt.hash(body.newPassword, 12, async (error, hashedPassword) => {
+        if (error) {
+          return res.status(500).json({ message: "something went wrong1" });
+        }
+        const editedUser = {};
+        body.newUsername ? (editedUser.username = body.newUsername) : null;
+        body.newPassword ? (editedUser.password = hashedPassword) : null;
+        body.firstName ? (editedUser.first_name = body.firstName) : null;
+        body.lastName ? (editedUser.last_name = body.lastName) : null;
+        body.gender ? (editedUser.gender = body.gender) : null;
+        body.birthday ? (editedUser.birthday = body.birthday) : null;
+        const newUser = { ...findUser.toObject(), ...editedUser };
+
+        const updatedUser = await User.findByIdAndUpdate(
+          user._id,
+          {
+            ...newUser,
+          },
+          { returnDocument: "after" }
+        ).select("-password -friend_requests -friend_list -creation_date -__v");
+
+        return res.status(200).json(updatedUser);
+      });
+    } catch (error) {
+      return res.status(500).json({ message: "something went wrong" });
+    }
   },
 ];
 
