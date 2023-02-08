@@ -275,7 +275,7 @@ exports.editUserImage = [
 
 exports.editUserInfo = [
   verifyUser,
-  body("newUsername")
+  body("username")
     .trim()
     .optional()
     .isLength({ min: 1 })
@@ -284,13 +284,13 @@ exports.editUserInfo = [
     .withMessage(
       "Email provided not is a valid email address, example of valid email:example@example.com"
     )
-    .custom((_value, { req }) => (req.body.confirmNewUsername ? true : false))
+    .custom((_value, { req }) => (req.body.confirmUsername ? true : false))
     .withMessage("Confirm new email is required"),
-  body("confirmNewUsername")
+  body("confirmUsername")
     .trim()
     .isLength({ min: 1 })
     .optional()
-    .custom((value, { req }) => value === req.body.newUsername)
+    .custom((value, { req }) => value === req.body.username)
     .withMessage(
       "Confirm new email and new email field must have the same value"
     )
@@ -306,7 +306,7 @@ exports.editUserInfo = [
       }
     })
     .escape(),
-  body("password")
+  body("oldPassword")
     .trim()
     .optional()
     .isLength({ min: 8 })
@@ -323,32 +323,40 @@ exports.editUserInfo = [
     })
     .escape(),
   body(
-    "newPassword",
+    "password",
     "confirm new password and new password field must have the same value"
   )
     .trim()
     .isLength({ min: 8 })
     .optional()
-    .custom((_value, { req }) => (req.body.confirmNewPassword ? true : false))
+    .custom((_value, { req }) => (req.body.confirmPassword ? true : false))
     .withMessage("Confirm new password is required")
     .escape(),
   body(
-    "confirmNewPassword",
+    "confirmPassword",
     "confirm new password and new password field must have the same value"
   )
     .trim()
     .isLength({ min: 8 })
     .optional()
-    .custom((value, { req }) => value === req.body.newPassword)
+    .custom((value, { req }) => value === req.body.password)
+    .custom((value, { req }) => {
+      if (!req.body.oldPassword && value) {
+        return false;
+      }
+
+      return true;
+    })
+    .withMessage("Old password is required if want to change it")
     .escape(),
-  body("firstName", "first name must not be empty")
+  body("first_name", "first name must not be empty")
     .trim()
     .isLength({ min: 1, max: 15 })
     .optional()
     .withMessage("First name cannot have more than 15 characters ")
     .blacklist(" ")
     .escape(),
-  body("lastName", "last name must not be empty")
+  body("last_name", "last name must not be empty")
     .trim()
     .optional()
     .isLength({ min: 1, max: 15 })
@@ -375,49 +383,38 @@ exports.editUserInfo = [
 
     const { user, body } = req;
 
+    const editedUser = { ...body };
+    delete editedUser.confirmUsername;
+    delete editedUser.oldPassword;
+    delete editedUser.confirmPassword;
+
     try {
       const findUser = await User.findById(user._id);
 
-      if (!body.newPassword) {
-        const editedUser = {};
-        body.newUsername ? (editedUser.username = body.newUsername) : null;
-        body.firstName ? (editedUser.first_name = body.firstName) : null;
-        body.lastName ? (editedUser.last_name = body.lastName) : null;
-        body.gender ? (editedUser.gender = body.gender) : null;
-        body.birthday ? (editedUser.birthday = body.birthday) : null;
+      if (!body.password) {
         const newUser = { ...findUser.toObject(), ...editedUser };
 
-        const updatedUser = await User.findByIdAndUpdate(
-          user._id,
-          {
-            ...newUser,
-          },
-          { returnDocument: "after" }
-        ).select("-password -friend_requests -friend_list -creation_date -__v");
-
-        return res.status(200).json({ updatedUser });
+        const updatedUser = await User.findByIdAndUpdate(user._id, newUser, {
+          returnDocument: "after",
+        }).select(
+          "-password -friend_requests -friend_list -creation_date -__v"
+        );
+        return res.status(200).json(updatedUser);
       }
 
-      bcrypt.hash(body.newPassword, 12, async (error, hashedPassword) => {
+      bcrypt.hash(body.password, 12, async (error, hashedPassword) => {
         if (error) {
-          return res.status(500).json({ message: "something went wrong1" });
+          return res.status(500).json({ message: "something went wrong" });
         }
-        const editedUser = {};
-        body.newUsername ? (editedUser.username = body.newUsername) : null;
-        body.newPassword ? (editedUser.password = hashedPassword) : null;
-        body.firstName ? (editedUser.first_name = body.firstName) : null;
-        body.lastName ? (editedUser.last_name = body.lastName) : null;
-        body.gender ? (editedUser.gender = body.gender) : null;
-        body.birthday ? (editedUser.birthday = body.birthday) : null;
+
+        editedUser.password = hashedPassword;
         const newUser = { ...findUser.toObject(), ...editedUser };
 
-        const updatedUser = await User.findByIdAndUpdate(
-          user._id,
-          {
-            ...newUser,
-          },
-          { returnDocument: "after" }
-        ).select("-password -friend_requests -friend_list -creation_date -__v");
+        const updatedUser = await User.findByIdAndUpdate(user._id, newUser, {
+          returnDocument: "after",
+        }).select(
+          "-password -friend_requests -friend_list -creation_date -__v"
+        );
 
         return res.status(200).json(updatedUser);
       });
