@@ -1,11 +1,12 @@
 const User = require("../models/user");
 const bcrypt = require("bcryptjs");
-const { body, validationResult, query } = require("express-validator");
+const { body, validationResult } = require("express-validator");
 const passport = require("passport");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const cloudinaryConfig = require("../config/cloudinaryconfig");
 const fs = require("node:fs/promises");
+const differenceInYears = require("date-fns/differenceInYears");
 
 const upload = multer({
   dest: "./tmp",
@@ -71,7 +72,17 @@ exports.postSignUp = [
     .isIn(["male", "female", "other"])
     .withMessage("gender provided is not valid")
     .escape(),
-  body("birthday", "birthday must not be empty").trim().escape().isDate(),
+  body("birthday", "birthday must not be empty")
+    .trim()
+    .escape()
+    .isDate()
+    .custom((value) => {
+      const todayDate = new Date();
+      return differenceInYears(todayDate, new Date(value)) >= 18;
+    })
+    .withMessage(
+      "You need to be at least 18 years old to be allowed for sign up"
+    ),
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -374,7 +385,12 @@ exports.editUserInfo = [
     .trim()
     .optional()
     .escape()
-    .isDate(),
+    .isDate()
+    .custom((value) => {
+      const todayDate = new Date();
+      return differenceInYears(todayDate, new Date(value)) >= 18;
+    })
+    .withMessage("You need to be at least 18 years old"),
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
