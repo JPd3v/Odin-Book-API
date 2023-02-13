@@ -1,6 +1,25 @@
 const Posts = require("../models/post");
 const { verifyUser } = require("../utils/authenticate");
 const { body, validationResult } = require("express-validator");
+const multer = require("multer");
+const cloudinaryConfig = require("../config/cloudinaryconfig");
+const fs = require("node:fs/promises");
+
+const upload = multer({
+  dest: "./tmp",
+  fileFilter: (req, file, cb) => {
+    if (
+      file.mimetype == "image/png" ||
+      file.mimetype == "image/jpg" ||
+      file.mimetype == "image/jpeg"
+    ) {
+      cb(null, true);
+    } else {
+      cb(null, false);
+      return cb(new Error("Only .png, .jpg and .jpeg format allowed"));
+    }
+  },
+});
 
 exports.getAllPosts = async (req, res) => {
   try {
@@ -115,10 +134,8 @@ exports.userPosts = [
 
 exports.postPost = [
   verifyUser,
-  body("content.text", "text cant be empty")
-    .trim()
-    .isLength({ min: 1 })
-    .escape(),
+  upload.any(),
+  body("text", "text cant be empty").trim().isLength({ min: 1 }).escape(),
   async (req, res) => {
     const errors = validationResult(req);
 
@@ -126,17 +143,50 @@ exports.postPost = [
       return res.status(422).json(errors);
     }
 
-    const newPost = new Posts({
-      creator: req.user._id,
-      content: { text: req.body.content.text },
-    });
+    function uploadImage(image) {
+      return cloudinaryConfig.uploader.upload(image.path);
+    }
 
+    function uploadImages(images) {
+      let promises = [];
+      images.map((image) => {
+        promises.push(uploadImage(image));
+      });
+      return Promise.all(promises);
+    }
     try {
+      const uploadToCloudinary = await uploadImages(req.files);
+
+      const images = [];
+      uploadToCloudinary.map((image) =>
+        images.push({ public_id: image.public_id, img: image.secure_url })
+      );
+
+      const newPost = new Posts({
+        creator: req.user._id,
+        content: { text: req.body.text, images: images },
+      });
+
+      async function deleteFIles(files) {
+        try {
+          await Promise.all(
+            files.map(async (file) => await fs.unlink(file.path))
+          );
+        } catch (error) {
+          console.log(error);
+        }
+      }
+
+      await deleteFIles(req.files);
       const savedPost = await newPost.save();
+
       return res.status(200).json({ new_post: savedPost });
     } catch (error) {
       return res.status(500).json({ message: "something went wrong" });
     }
+  },
+  (error, req, res, next) => {
+    return res.status(422).json({ message: error.message });
   },
 ];
 
