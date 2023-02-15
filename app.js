@@ -7,6 +7,7 @@ const cors = require("cors");
 
 require("./strategies/JwtStrategy");
 require("./strategies/LocalStrategy");
+require("./strategies/facebookStrategy");
 
 //cors configuarion
 const whitelist = process.env.WHITELISTED_ORIGINS
@@ -42,11 +43,13 @@ db.on("error", console.error.bind(console, "MongoDB connection error"));
 
 // Routes
 const userRoutes = require("./routes/user");
+const oAuthRoutes = require("./routes/oAuth");
 const postsRoutes = require("./routes/posts");
 const commentsRoutes = require("./routes/comment");
 const repliesRoutes = require("./routes/replies");
 
 app.use("/users", userRoutes);
+app.use("/oauth", oAuthRoutes);
 app.use("/posts", postsRoutes);
 app.use("/comments", commentsRoutes);
 app.use("/replies", repliesRoutes);

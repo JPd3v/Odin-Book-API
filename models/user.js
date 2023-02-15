@@ -5,8 +5,8 @@ const DEFAULT_PROFILE_IMG =
   "https://res.cloudinary.com/dvnawerv1/image/upload/v1671863396/obbtgos8csgnzrplinzs.jpg";
 
 const userSchema = new Schema({
-  username: { type: String, required: true },
-  password: { type: String, required: true, minLength: 8 },
+  username: { type: String, minLength: 8 },
+  password: { type: String, minLength: 8 },
   first_name: { type: String, required: true },
   last_name: { type: String, required: true },
   profile_image: {
@@ -14,11 +14,12 @@ const userSchema = new Schema({
     img: { type: String, required: true, default: DEFAULT_PROFILE_IMG },
   },
   creation_date: { type: Date, required: true, default: Date.now },
-  gender: { type: String, enum: ["male", "female", "other"] },
-  birthday: { type: String, required: true },
+  gender: { type: String, enum: ["male", "female", "other"], default: "other" },
+  birthday: { type: String },
   refresh_token: { type: String, default: "" },
   friend_requests: [{ type: Schema.Types.ObjectId, ref: "Users" }],
   friend_list: [{ type: Schema.Types.ObjectId, ref: "Users" }],
+  oAuth_id: { type: String },
 });
 
 userSchema.set("toJSON", {

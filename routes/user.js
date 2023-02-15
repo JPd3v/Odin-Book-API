@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 
 const userController = require("../controllers/userController");
-const friends = require("../controllers/friendshipController");
 
 // User
 router.post("/sign-up", userController.postSignUp);
