@@ -273,6 +273,7 @@ exports.getRefreshToken = async (req, res) => {
 
       const foundUser = await User.findById(payload._id);
       foundUser.refresh_token = newRefreshToken;
+
       const userInfo = {
         _id: foundUser._id,
         first_name: foundUser.first_name,
@@ -281,6 +282,7 @@ exports.getRefreshToken = async (req, res) => {
         email: foundUser.username,
         gender: foundUser.gender,
         birthday: foundUser.birthday,
+        oAuth_id: foundUser.oAuth_id,
       };
 
       await foundUser.save();
