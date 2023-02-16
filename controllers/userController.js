@@ -203,6 +203,43 @@ exports.postLogIn = [
   },
 ];
 
+exports.guestAccount = async (req, res) => {
+  try {
+    const GUEST_ACCOUNT_ID = "63ed77897c0ba6b3f6fd4ebb";
+
+    const foundGuestAccount = await User.findById(GUEST_ACCOUNT_ID);
+
+    if (!foundGuestAccount) {
+      return res
+        .status(404)
+        .json({ message: "something went wrong try again later" });
+    }
+
+    const refreshToken = getRefreshToken({ _id: foundGuestAccount._id });
+    const token = getToken({ _id: foundGuestAccount._id });
+
+    foundGuestAccount.refresh_token = refreshToken;
+    await foundGuestAccount.save();
+
+    const userInfo = {
+      _id: foundGuestAccount._id,
+      first_name: foundGuestAccount.first_name,
+      last_name: foundGuestAccount.last_name,
+      profile_image: foundGuestAccount.profile_image.img,
+      email: foundGuestAccount.username,
+      gender: foundGuestAccount.gender,
+      birthday: foundGuestAccount.birthday,
+    };
+
+    res.cookie("refreshToken", refreshToken, COOKIE_OPTIONS);
+    return res.status(200).json({ token, userInfo });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: "something went wrong try again later" });
+  }
+};
+
 exports.postLogOut = [
   verifyUser,
   async (req, res) => {

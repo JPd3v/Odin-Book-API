@@ -6,6 +6,7 @@ const userController = require("../controllers/userController");
 // User
 router.post("/sign-up", userController.postSignUp);
 router.post("/log-in", userController.postLogIn);
+router.get("/log-in/guest-account", userController.guestAccount);
 router.post("/log-out", userController.postLogOut);
 router.put("/edit-image", userController.editUserImage);
 router.put("/edit-info", userController.editUserInfo);
