@@ -303,7 +303,6 @@ exports.editUserImage = [
       const result = cloudinaryConfig.url(publicId, {
         quality: "auto",
         fetch_format: "auto",
-        width: 300,
         height: 300,
       });
       return result;
