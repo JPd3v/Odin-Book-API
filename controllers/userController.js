@@ -299,13 +299,26 @@ exports.editUserImage = [
   verifyUser,
   upload.single("profile_img"),
   async (req, res) => {
+    function imagePublicUrl(publicId) {
+      const result = cloudinaryConfig.url(publicId, {
+        quality: "auto",
+        fetch_format: "auto",
+        width: 300,
+        height: 300,
+      });
+      return result;
+    }
+
     try {
       const file = req.file;
       const savedImg = await cloudinaryConfig.uploader.upload(file.path);
+      const publicUrl = imagePublicUrl(savedImg.public_id);
+
       await fs.unlink(file.path);
-      const saveUser = await User.findByIdAndUpdate(req.user._id, {
-        profile_image: { public_id: savedImg.public_id, img: savedImg.url },
+      await User.findByIdAndUpdate(req.user._id, {
+        profile_image: { public_id: savedImg.public_id, img: publicUrl },
       });
+
       // if users already have a profile image delete old image from cloud storage
       req.user.profile_image.public_id
         ? await cloudinaryConfig.uploader.destroy(
@@ -313,7 +326,7 @@ exports.editUserImage = [
           )
         : null;
 
-      return res.status(200).json(savedImg.url);
+      return res.status(200).json(publicUrl);
     } catch (error) {
       return res.status(500).json({ message: "something went wrong" });
     }

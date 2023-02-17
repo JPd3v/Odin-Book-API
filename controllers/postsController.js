@@ -154,13 +154,24 @@ exports.postPost = [
       });
       return Promise.all(promises);
     }
+
+    function imagePublicUrl(publicId) {
+      const result = cloudinaryConfig.url(publicId, {
+        quality: "auto",
+        fetch_format: "auto",
+      });
+      return result;
+    }
+
     try {
       const uploadToCloudinary = await uploadImages(req.files);
 
       const images = [];
-      uploadToCloudinary.map((image) =>
-        images.push({ public_id: image.public_id, img: image.secure_url })
-      );
+
+      uploadToCloudinary.map((image) => {
+        const publicUrl = imagePublicUrl(image.public_id);
+        return images.push({ public_id: image.public_id, img: publicUrl });
+      });
 
       const newPost = new Posts({
         creator: req.user._id,
