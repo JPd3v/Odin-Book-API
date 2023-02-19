@@ -8,9 +8,10 @@ passport.use(
     {
       clientID: process.env.FACEBOOK_APP_ID,
       clientSecret: process.env.FACEBOOK_APP_SECRET,
-      callbackURL: "/oauth/auth/facebook/callback",
+      callbackURL: process.env.HOST_URL_BACKEND_FACEBOOK_REDIRECT,
     },
     async function (accessToken, refreshToken, profile, cb) {
+      console.log(profile);
       try {
         const foundUser = await User.findOne({ oAuth_id: profile.id });
 
