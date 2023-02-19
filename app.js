@@ -5,8 +5,8 @@ const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 
-require("./strategies/JwtStrategy");
-require("./strategies/LocalStrategy");
+require("./strategies/jwtStrategy");
+require("./strategies/localStrategy");
 require("./strategies/facebookStrategy");
 
 //cors configuarion
