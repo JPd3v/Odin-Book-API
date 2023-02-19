@@ -3,7 +3,7 @@ const { verifyUser } = require("../utils/authenticate");
 const { body, validationResult } = require("express-validator");
 const multer = require("multer");
 const cloudinaryConfig = require("../config/cloudinaryconfig");
-const fs = require("node:fs/promises");
+const fs = require("fs").promises;
 
 const upload = multer({
   dest: "./tmp",

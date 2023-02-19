@@ -5,7 +5,7 @@ const passport = require("passport");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const cloudinaryConfig = require("../config/cloudinaryconfig");
-const fs = require("node:fs/promises");
+const fs = require("fs").promises;
 const differenceInYears = require("date-fns/differenceInYears");
 
 const upload = multer({
