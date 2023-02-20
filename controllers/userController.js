@@ -268,27 +268,31 @@ exports.getRefreshToken = async (req, res) => {
         process.env.REFRESH_TOKEN_SECRET
       );
 
-      const newToken = getToken({ _id: payload._id });
-      const newRefreshToken = getRefreshToken({ _id: payload._id });
-
       const foundUser = await User.findById(payload._id);
-      foundUser.refresh_token = newRefreshToken;
+      if (foundUser) {
+        const newToken = getToken({ _id: payload._id });
+        const newRefreshToken = getRefreshToken({ _id: payload._id });
 
-      const userInfo = {
-        _id: foundUser._id,
-        first_name: foundUser.first_name,
-        last_name: foundUser.last_name,
-        profile_image: foundUser.profile_image.img,
-        email: foundUser.username,
-        gender: foundUser.gender,
-        birthday: foundUser.birthday,
-        oAuth_id: foundUser.oAuth_id,
-      };
+        if (foundUser.refresh_token === refreshToken) {
+          foundUser.refresh_token = newRefreshToken;
 
-      await foundUser.save();
+          const userInfo = {
+            _id: foundUser._id,
+            first_name: foundUser.first_name,
+            last_name: foundUser.last_name,
+            profile_image: foundUser.profile_image.img,
+            email: foundUser.username,
+            gender: foundUser.gender,
+            birthday: foundUser.birthday,
+            oAuth_id: foundUser.oAuth_id,
+          };
 
-      res.cookie("refreshToken", newRefreshToken, COOKIE_OPTIONS);
-      return res.status(200).json({ token: newToken, userInfo });
+          await foundUser.save();
+
+          res.cookie("refreshToken", newRefreshToken, COOKIE_OPTIONS);
+          return res.status(200).json({ token: newToken, userInfo });
+        }
+      }
     } catch (error) {
       return res.status(500).json({ message: "something went wrong" });
     }
