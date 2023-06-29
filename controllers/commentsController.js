@@ -55,22 +55,20 @@ exports.postComment = [
     }
 
     try {
+      const foundPost = await Posts.findById(postId);
+      if (!foundPost) {
+        return res.status(404).json({ message: "post not found" });
+      }
+
       const newComment = new Comments({
         creator: req.user._id,
         post_id: postId,
         content: { text: req.body.comment_text },
       });
 
-      const foundPost = await Posts.findById(postId);
-      if (!foundPost) {
-        return res.status(404).json({ message: "post not found" });
-      }
       const savedComment = await (
         await newComment.save()
       ).populate("creator", "_id first_name last_name profile_image");
-
-      foundPost.comments.push(savedComment._id);
-      await foundPost.save();
 
       return res.status(200).json(savedComment);
     } catch (error) {
@@ -120,10 +118,6 @@ exports.deleteComment = [
 
       if (foundComment.creator.toString() === req.user._id.toString()) {
         await Comments.findByIdAndDelete(commentId);
-
-        await Posts.findByIdAndUpdate(foundComment.post_id, {
-          $pull: { comments: commentId },
-        });
 
         return res.status(200).json({ message: "comment deleted succefully" });
       }

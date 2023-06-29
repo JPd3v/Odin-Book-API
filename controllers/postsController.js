@@ -23,22 +23,7 @@ const upload = multer({
 
 exports.getAllPosts = async (req, res) => {
   try {
-    const posts = await Posts.find({})
-      .populate("creator", "_id first_name last_name")
-      .populate({
-        path: "comments",
-        populate: [
-          { path: "creator", select: "_id first_name last_name" },
-          {
-            path: "replies",
-            select: "creator edited likes timestamp content",
-            populate: {
-              path: "creator",
-              select: "_id first_name last_name",
-            },
-          },
-        ],
-      });
+    const posts = await Posts.find({}).populate("creator", "_id first_name last_name");
 
     return res.status(200).json(posts);
   } catch (error) {
@@ -63,26 +48,7 @@ exports.userFeed = [
         })
         .limit(postPerQuery)
         .skip(queryPage)
-        .populate("creator", "_id first_name last_name profile_image")
-        .populate({
-          path: "comments",
-          options: { sort: { timestamp: "desc" } },
-          populate: [
-            {
-              path: "creator",
-              select: "_id first_name last_name profile_image",
-            },
-            {
-              path: "replies",
-              select: "",
-              populate: {
-                path: "creator",
-                select: "_id first_name last_name profile_image",
-              },
-            },
-          ],
-        });
-
+        .populate("creator", "_id first_name last_name profile_image");
       return res.status(200).json(posts);
     } catch (error) {
       return res.status(500).json({ message: "something went wrong" });
@@ -106,25 +72,8 @@ exports.userPosts = [
         })
         .limit(postPerQuery)
         .skip(queryPage)
-        .populate("creator", "_id first_name last_name profile_image")
-        .populate({
-          path: "comments",
-          options: { sort: { timestamp: "desc" } },
-          populate: [
-            {
-              path: "creator",
-              select: "_id first_name last_name profile_image",
-            },
-            {
-              path: "replies",
-              select: "",
-              populate: {
-                path: "creator",
-                select: "_id first_name last_name profile_image",
-              },
-            },
-          ],
-        });
+        .populate("creator", "_id first_name last_name profile_image");
+
       return res.status(200).json(posts);
     } catch (error) {
       return res.status(500).json({ message: "something went wrong" });
@@ -178,17 +127,15 @@ exports.postPost = [
         content: { text: req.body.text, images: images },
       });
 
-      async function deleteFIles(files) {
+      async function deleteFiles(files) {
         try {
-          await Promise.all(
-            files.map(async (file) => await fs.unlink(file.path))
-          );
+          await Promise.all(files.map(async (file) => await fs.unlink(file.path)));
         } catch (error) {
           console.log(error);
         }
       }
 
-      await deleteFIles(req.files);
+      await deleteFiles(req.files);
       const savedPost = await newPost.save();
 
       return res.status(200).json({ new_post: savedPost });
@@ -203,10 +150,7 @@ exports.postPost = [
 
 exports.putPost = [
   verifyUser,
-  body("content.text", "text cant be empty")
-    .trim()
-    .isLength({ min: 1 })
-    .escape(),
+  body("content.text", "text cant be empty").trim().isLength({ min: 1 }).escape(),
   async (req, res) => {
     const errors = validationResult(req);
 
@@ -297,26 +241,11 @@ exports.getPost = [
   verifyUser,
   async (req, res) => {
     try {
-      const foundPost = await Posts.findById(req.params.postId)
-        .populate("creator", "_id first_name last_name profile_image")
-        .populate({
-          path: "comments",
-          options: { sort: { timestamp: "desc" } },
-          populate: [
-            {
-              path: "creator",
-              select: "_id first_name last_name profile_image",
-            },
-            {
-              path: "replies",
-              select: "",
-              populate: {
-                path: "creator",
-                select: "_id first_name last_name profile_image",
-              },
-            },
-          ],
-        });
+      const foundPost = await Posts.findById(req.params.postId).populate(
+        "creator",
+        "_id first_name last_name profile_image"
+      );
+
       if (!foundPost) {
         return res.status(404).json({ message: "post not found" });
       }

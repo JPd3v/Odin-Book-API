@@ -12,7 +12,6 @@ const postSchema = new Schema({
   edited: { type: Boolean, required: true, default: false },
   likes: [{ type: Schema.Types.ObjectId, ref: "Users" }],
   timestamp: { type: Date, required: true, default: Date.now },
-  comments: [{ type: Schema.Types.ObjectId, ref: "Comments" }],
 });
 
 postSchema.pre("findOneAndDelete", async function () {
