@@ -1,8 +1,9 @@
 const Posts = require("../models/post");
 const { verifyUser } = require("../utils/authenticate");
-const { body, validationResult } = require("express-validator");
+const { body, validationResult, param, query } = require("express-validator");
 const multer = require("multer");
 const cloudinaryConfig = require("../config/cloudinaryconfig");
+const Comments = require("../models/comment");
 const fs = require("fs").promises;
 
 const upload = multer({
@@ -23,22 +24,7 @@ const upload = multer({
 
 exports.getAllPosts = async (req, res) => {
   try {
-    const posts = await Posts.find({})
-      .populate("creator", "_id first_name last_name")
-      .populate({
-        path: "comments",
-        populate: [
-          { path: "creator", select: "_id first_name last_name" },
-          {
-            path: "replies",
-            select: "creator edited likes timestamp content",
-            populate: {
-              path: "creator",
-              select: "_id first_name last_name",
-            },
-          },
-        ],
-      });
+    const posts = await Posts.find({}).populate("creator", "_id first_name last_name");
 
     return res.status(200).json(posts);
   } catch (error) {
@@ -48,11 +34,24 @@ exports.getAllPosts = async (req, res) => {
 
 exports.userFeed = [
   verifyUser,
+  query("page").trim().isInt({ min: 1 }).withMessage("page should be minimum 1").escape(),
+  query("pageSize")
+    .trim()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("pageSize should be min 1 and max 100")
+    .escape(),
   async (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      return res.status(422).json(errors);
+    }
+
     const { user } = req;
+    const { page, pageSize } = req.query;
     try {
-      const currentPage = req.query.page - 1;
-      const postPerQuery = req.query.pageSize || 5;
+      const currentPage = page - 1;
+      const postPerQuery = pageSize;
       const queryPage = postPerQuery * currentPage;
 
       const mongoDBQuery = [...user.friend_list, user._id];
@@ -63,26 +62,7 @@ exports.userFeed = [
         })
         .limit(postPerQuery)
         .skip(queryPage)
-        .populate("creator", "_id first_name last_name profile_image")
-        .populate({
-          path: "comments",
-          options: { sort: { timestamp: "desc" } },
-          populate: [
-            {
-              path: "creator",
-              select: "_id first_name last_name profile_image",
-            },
-            {
-              path: "replies",
-              select: "",
-              populate: {
-                path: "creator",
-                select: "_id first_name last_name profile_image",
-              },
-            },
-          ],
-        });
-
+        .populate("creator", "_id first_name last_name profile_image");
       return res.status(200).json(posts);
     } catch (error) {
       return res.status(500).json({ message: "something went wrong" });
@@ -92,39 +72,46 @@ exports.userFeed = [
 
 exports.userPosts = [
   verifyUser,
+  param("userId")
+    .trim()
+    .isMongoId()
+    .withMessage("id should be a valid mongodb id")
+    .escape(),
+  query("page").trim().isInt({ min: 1 }).withMessage("page should be minimum 1").escape(),
+  query("pageSize")
+    .trim()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("pageSize should be min 1 and max 100")
+    .escape(),
+  query("sort")
+    .trim()
+    .isIn(["asc", "desc"])
+    .withMessage("sort should be asc or desc")
+    .escape()
+    .optional(),
   async (req, res) => {
-    const user = req.params.userId;
+    const errors = validationResult(req);
 
+    if (!errors.isEmpty()) {
+      return res.status(422).json(errors);
+    }
+
+    const user = req.params.userId;
+    const { page, pageSize, sort } = req.query;
     try {
-      const currentPage = req.query.page - 1;
-      const postPerQuery = req.query.pageSize || 5;
+      const currentPage = page - 1;
+      const postPerQuery = pageSize;
       const queryPage = postPerQuery * currentPage;
+      const pageSort = sort ?? "desc";
 
       const posts = await Posts.find({ creator: user })
         .sort({
-          timestamp: "desc",
+          timestamp: pageSort,
         })
         .limit(postPerQuery)
         .skip(queryPage)
-        .populate("creator", "_id first_name last_name profile_image")
-        .populate({
-          path: "comments",
-          options: { sort: { timestamp: "desc" } },
-          populate: [
-            {
-              path: "creator",
-              select: "_id first_name last_name profile_image",
-            },
-            {
-              path: "replies",
-              select: "",
-              populate: {
-                path: "creator",
-                select: "_id first_name last_name profile_image",
-              },
-            },
-          ],
-        });
+        .populate("creator", "_id first_name last_name profile_image");
+
       return res.status(200).json(posts);
     } catch (error) {
       return res.status(500).json({ message: "something went wrong" });
@@ -162,9 +149,8 @@ exports.postPost = [
       });
       return result;
     }
-
     try {
-      const uploadToCloudinary = await uploadImages(req.files);
+      const uploadToCloudinary = await uploadImages(req.files ?? []);
 
       const images = [];
 
@@ -178,21 +164,20 @@ exports.postPost = [
         content: { text: req.body.text, images: images },
       });
 
-      async function deleteFIles(files) {
+      async function deleteFiles(files) {
         try {
-          await Promise.all(
-            files.map(async (file) => await fs.unlink(file.path))
-          );
+          await Promise.all(files.map(async (file) => await fs.unlink(file.path)));
         } catch (error) {
           console.log(error);
         }
       }
 
-      await deleteFIles(req.files);
+      await deleteFiles(req.files);
       const savedPost = await newPost.save();
 
       return res.status(200).json({ new_post: savedPost });
     } catch (error) {
+      console.log(error);
       return res.status(500).json({ message: "something went wrong" });
     }
   },
@@ -203,10 +188,8 @@ exports.postPost = [
 
 exports.putPost = [
   verifyUser,
-  body("content.text", "text cant be empty")
-    .trim()
-    .isLength({ min: 1 })
-    .escape(),
+  body("content.text", "text cant be empty").trim().isLength({ min: 1 }).escape(),
+  param("id").trim().isMongoId().withMessage("id should be a valid mongodb id").escape(),
   async (req, res) => {
     const errors = validationResult(req);
 
@@ -242,15 +225,24 @@ exports.putPost = [
 
 exports.deletePost = [
   verifyUser,
+  param("id").trim().isMongoId().withMessage("id should be a valid mongodb id").escape(),
   async (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      return res.status(422).json(errors);
+    }
+
+    const postId = req.params.id;
+
     try {
-      const foundPost = await Posts.findById(req.params.id);
+      const foundPost = await Posts.findById(postId);
       if (!foundPost) {
         return res.status(404).json({ message: "post not found" });
       }
 
       if (foundPost.creator.toString() === req.user._id.toString()) {
-        await Posts.findByIdAndDelete(req.params.id);
+        await Posts.findByIdAndDelete(postId);
 
         return res.status(200).json({ message: "Post deleted successfully" });
       }
@@ -266,7 +258,14 @@ exports.deletePost = [
 
 exports.postLike = [
   verifyUser,
+  param("id").trim().isMongoId().withMessage("id should be a valid mongodb id").escape(),
   async (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      return res.status(422).json(errors);
+    }
+
     try {
       const foundPost = await Posts.findById(req.params.id);
       if (!foundPost) {
@@ -295,32 +294,75 @@ exports.postLike = [
 
 exports.getPost = [
   verifyUser,
+  param("postId")
+    .trim()
+    .isMongoId()
+    .withMessage("postId should be a valid mongodb id")
+    .escape(),
   async (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      return res.status(422).json(errors);
+    }
+
     try {
-      const foundPost = await Posts.findById(req.params.postId)
-        .populate("creator", "_id first_name last_name profile_image")
-        .populate({
-          path: "comments",
-          options: { sort: { timestamp: "desc" } },
-          populate: [
-            {
-              path: "creator",
-              select: "_id first_name last_name profile_image",
-            },
-            {
-              path: "replies",
-              select: "",
-              populate: {
-                path: "creator",
-                select: "_id first_name last_name profile_image",
-              },
-            },
-          ],
-        });
+      const foundPost = await Posts.findById(req.params.postId).populate(
+        "creator",
+        "_id first_name last_name profile_image"
+      );
+
       if (!foundPost) {
         return res.status(404).json({ message: "post not found" });
       }
       return res.status(200).json(foundPost);
+    } catch (error) {
+      return res.status(500).json({ message: "something went wrong" });
+    }
+  },
+];
+
+exports.postComments = [
+  verifyUser,
+  param("postId")
+    .trim()
+    .isMongoId()
+    .withMessage("id should be a valid mongodb id")
+    .escape(),
+  query("page").trim().isInt({ min: 1 }).withMessage("page should be minimum 1").escape(),
+  query("pageSize")
+    .trim()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("pageSize should be min 1 and max 100")
+    .escape(),
+  query("sort")
+    .trim()
+    .isIn(["asc", "desc"])
+    .withMessage("sort should be asc or desc")
+    .escape(),
+
+  async (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      return res.status(422).json(errors);
+    }
+
+    const { page, pageSize, sort } = req.query;
+    const { postId } = req.params;
+
+    const currentPage = page - 1;
+    const offset = currentPage * pageSize;
+
+    try {
+      const foundComments = await Comments.find({ post_id: postId })
+        .sort({
+          timestamp: sort,
+        })
+        .limit(pageSize)
+        .skip(offset)
+        .populate("likesCount");
+      return res.status(200).json(foundComments);
     } catch (error) {
       return res.status(500).json({ message: "something went wrong" });
     }
