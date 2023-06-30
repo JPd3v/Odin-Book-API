@@ -1,8 +1,9 @@
 const Posts = require("../models/post");
 const { verifyUser } = require("../utils/authenticate");
-const { body, validationResult } = require("express-validator");
+const { body, validationResult, param, query } = require("express-validator");
 const multer = require("multer");
 const cloudinaryConfig = require("../config/cloudinaryconfig");
+const Comments = require("../models/comment");
 const fs = require("fs").promises;
 
 const upload = multer({
@@ -250,6 +251,56 @@ exports.getPost = [
         return res.status(404).json({ message: "post not found" });
       }
       return res.status(200).json(foundPost);
+    } catch (error) {
+      return res.status(500).json({ message: "something went wrong" });
+    }
+  },
+];
+
+exports.postComments = [
+  verifyUser,
+  param("postId")
+    .trim()
+    .isMongoId()
+    .withMessage("id should be a valid mongodb id")
+    .escape(),
+  query("page")
+    .trim()
+    .isInt({ min: 0 })
+    .withMessage("page should be 0 or higher")
+    .escape(),
+  query("pageSize")
+    .trim()
+    .isInt({ min: 1 })
+    .withMessage("pageSize should be 1 or higher")
+    .escape(),
+  query("sort")
+    .trim()
+    .isIn(["asc", "desc"])
+    .withMessage("sort should be asc or desc")
+    .escape(),
+
+  async (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      return res.status(422).json(errors);
+    }
+
+    const { page, pageSize, sort } = req.query;
+    const { postId } = req.params;
+
+    const offset = page * pageSize;
+
+    try {
+      const foundComments = await Comments.find({ post_id: postId })
+        .sort({
+          timestamp: sort,
+        })
+        .limit(pageSize)
+        .skip(offset);
+
+      return res.status(200).json(foundComments);
     } catch (error) {
       return res.status(500).json({ message: "something went wrong" });
     }
