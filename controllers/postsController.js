@@ -4,6 +4,7 @@ const { body, validationResult, param, query } = require("express-validator");
 const multer = require("multer");
 const cloudinaryConfig = require("../config/cloudinaryconfig");
 const Comments = require("../models/comment");
+const postLikes = require("../models/postLikes");
 const fs = require("fs").promises;
 
 const upload = multer({
@@ -24,7 +25,9 @@ const upload = multer({
 
 exports.getAllPosts = async (req, res) => {
   try {
-    const posts = await Posts.find({}).populate("creator", "_id first_name last_name");
+    const posts = await Posts.find({})
+      .populate("creator", "_id first_name last_name")
+      .populate("likesCount commentCount");
 
     return res.status(200).json(posts);
   } catch (error) {
@@ -173,7 +176,7 @@ exports.postPost = [
       }
 
       await deleteFiles(req.files);
-      const savedPost = await newPost.save();
+      const savedPost = await (await newPost.save()).populate("likesCount commentCount");
 
       return res.status(200).json({ new_post: savedPost });
     } catch (error) {
@@ -266,26 +269,29 @@ exports.postLike = [
       return res.status(422).json(errors);
     }
 
+    const userId = req.user._id;
+    const postId = req.params.id;
+
     try {
-      const foundPost = await Posts.findById(req.params.id);
+      const foundPost = await Posts.findById(postId);
+
       if (!foundPost) {
-        return res.status(404).json({ message: "post not found" });
+        return res.status(404).json({ message: "Post not found" });
       }
 
-      let userLikeIndex = foundPost.likes.findIndex(
-        (element) => element.toString() === req.user._id.toString()
-      );
+      const userAlreadyLiked = await postLikes.findOne({
+        post_id: postId,
+        user_id: userId,
+      });
 
-      if (userLikeIndex === -1) {
-        foundPost.likes.push(req.user._id);
-        await foundPost.save();
-        return res.status(200).json(foundPost.likes);
+      if (!userAlreadyLiked) {
+        await postLikes.create({ post_id: postId, user_id: userId });
+        return res.status(201).json({ message: "Post like added successfully" });
       }
 
-      foundPost.likes.splice(userLikeIndex, 1);
-      await foundPost.save();
+      await postLikes.deleteOne({ post_id: postId, user_id: userId });
 
-      return res.status(200).json(foundPost.likes);
+      return res.status(200).json({ message: "Post like deleted successfully" });
     } catch (error) {
       return res.status(500).json({ message: "something went wrong" });
     }
@@ -307,10 +313,9 @@ exports.getPost = [
     }
 
     try {
-      const foundPost = await Posts.findById(req.params.postId).populate(
-        "creator",
-        "_id first_name last_name profile_image"
-      );
+      const foundPost = await Posts.findById(req.params.postId)
+        .populate("creator", "_id first_name last_name profile_image")
+        .populate("likesCount commentCount");
 
       if (!foundPost) {
         return res.status(404).json({ message: "post not found" });
