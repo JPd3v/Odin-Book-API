@@ -34,11 +34,24 @@ exports.getAllPosts = async (req, res) => {
 
 exports.userFeed = [
   verifyUser,
+  query("page").trim().isInt({ min: 1 }).withMessage("page should be minimum 1").escape(),
+  query("pageSize")
+    .trim()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("pageSize should be min 1 and max 100")
+    .escape(),
   async (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      return res.status(422).json(errors);
+    }
+
     const { user } = req;
+    const { page, pageSize } = req.query;
     try {
-      const currentPage = req.query.page - 1;
-      const postPerQuery = req.query.pageSize || 5;
+      const currentPage = page - 1;
+      const postPerQuery = pageSize;
       const queryPage = postPerQuery * currentPage;
 
       const mongoDBQuery = [...user.friend_list, user._id];
@@ -59,17 +72,41 @@ exports.userFeed = [
 
 exports.userPosts = [
   verifyUser,
+  param("userId")
+    .trim()
+    .isMongoId()
+    .withMessage("id should be a valid mongodb id")
+    .escape(),
+  query("page").trim().isInt({ min: 1 }).withMessage("page should be minimum 1").escape(),
+  query("pageSize")
+    .trim()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("pageSize should be min 1 and max 100")
+    .escape(),
+  query("sort")
+    .trim()
+    .isIn(["asc", "desc"])
+    .withMessage("sort should be asc or desc")
+    .escape()
+    .optional(),
   async (req, res) => {
-    const user = req.params.userId;
+    const errors = validationResult(req);
 
+    if (!errors.isEmpty()) {
+      return res.status(422).json(errors);
+    }
+
+    const user = req.params.userId;
+    const { page, pageSize, sort } = req.query;
     try {
-      const currentPage = req.query.page - 1;
-      const postPerQuery = req.query.pageSize || 5;
+      const currentPage = page - 1;
+      const postPerQuery = pageSize;
       const queryPage = postPerQuery * currentPage;
+      const pageSort = sort ?? "desc";
 
       const posts = await Posts.find({ creator: user })
         .sort({
-          timestamp: "desc",
+          timestamp: pageSort,
         })
         .limit(postPerQuery)
         .skip(queryPage)
@@ -112,9 +149,8 @@ exports.postPost = [
       });
       return result;
     }
-
     try {
-      const uploadToCloudinary = await uploadImages(req.files);
+      const uploadToCloudinary = await uploadImages(req.files ?? []);
 
       const images = [];
 
@@ -141,6 +177,7 @@ exports.postPost = [
 
       return res.status(200).json({ new_post: savedPost });
     } catch (error) {
+      console.log(error);
       return res.status(500).json({ message: "something went wrong" });
     }
   },
@@ -152,6 +189,7 @@ exports.postPost = [
 exports.putPost = [
   verifyUser,
   body("content.text", "text cant be empty").trim().isLength({ min: 1 }).escape(),
+  param("id").trim().isMongoId().withMessage("id should be a valid mongodb id").escape(),
   async (req, res) => {
     const errors = validationResult(req);
 
@@ -187,15 +225,24 @@ exports.putPost = [
 
 exports.deletePost = [
   verifyUser,
+  param("id").trim().isMongoId().withMessage("id should be a valid mongodb id").escape(),
   async (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      return res.status(422).json(errors);
+    }
+
+    const postId = req.params.id;
+
     try {
-      const foundPost = await Posts.findById(req.params.id);
+      const foundPost = await Posts.findById(postId);
       if (!foundPost) {
         return res.status(404).json({ message: "post not found" });
       }
 
       if (foundPost.creator.toString() === req.user._id.toString()) {
-        await Posts.findByIdAndDelete(req.params.id);
+        await Posts.findByIdAndDelete(postId);
 
         return res.status(200).json({ message: "Post deleted successfully" });
       }
@@ -211,7 +258,14 @@ exports.deletePost = [
 
 exports.postLike = [
   verifyUser,
+  param("id").trim().isMongoId().withMessage("id should be a valid mongodb id").escape(),
   async (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      return res.status(422).json(errors);
+    }
+
     try {
       const foundPost = await Posts.findById(req.params.id);
       if (!foundPost) {
@@ -240,7 +294,18 @@ exports.postLike = [
 
 exports.getPost = [
   verifyUser,
+  param("postId")
+    .trim()
+    .isMongoId()
+    .withMessage("postId should be a valid mongodb id")
+    .escape(),
   async (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      return res.status(422).json(errors);
+    }
+
     try {
       const foundPost = await Posts.findById(req.params.postId).populate(
         "creator",
@@ -264,15 +329,11 @@ exports.postComments = [
     .isMongoId()
     .withMessage("id should be a valid mongodb id")
     .escape(),
-  query("page")
-    .trim()
-    .isInt({ min: 0 })
-    .withMessage("page should be 0 or higher")
-    .escape(),
+  query("page").trim().isInt({ min: 1 }).withMessage("page should be minimum 1").escape(),
   query("pageSize")
     .trim()
-    .isInt({ min: 1 })
-    .withMessage("pageSize should be 1 or higher")
+    .isInt({ min: 1, max: 100 })
+    .withMessage("pageSize should be min 1 and max 100")
     .escape(),
   query("sort")
     .trim()
@@ -290,7 +351,8 @@ exports.postComments = [
     const { page, pageSize, sort } = req.query;
     const { postId } = req.params;
 
-    const offset = page * pageSize;
+    const currentPage = page - 1;
+    const offset = currentPage * pageSize;
 
     try {
       const foundComments = await Comments.find({ post_id: postId })
@@ -298,8 +360,8 @@ exports.postComments = [
           timestamp: sort,
         })
         .limit(pageSize)
-        .skip(offset);
-
+        .skip(offset)
+        .populate("likesCount");
       return res.status(200).json(foundComments);
     } catch (error) {
       return res.status(500).json({ message: "something went wrong" });
