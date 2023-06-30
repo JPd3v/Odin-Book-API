@@ -1,7 +1,8 @@
-const { body, validationResult } = require("express-validator");
+const { body, validationResult, param } = require("express-validator");
 const Comments = require("../models/comment");
 const Posts = require("../models/post");
 const { verifyUser } = require("../utils/authenticate");
+const commentLikes = require("../models/commentLikes");
 
 exports.getAllComments = async (req, res) => {
   try {
@@ -10,13 +11,7 @@ exports.getAllComments = async (req, res) => {
         "creator replies",
         "_id first_name last_name creator edited likes timestamp content"
       )
-      .populate({
-        path: "replies",
-        populate: {
-          path: "creator",
-          select: "",
-        },
-      });
+      .populate("likesCount");
 
     return res.status(200).json(allComments);
   } catch (error) {
@@ -24,24 +19,39 @@ exports.getAllComments = async (req, res) => {
   }
 };
 
-exports.getSingleComment = async (req, res) => {
-  try {
-    const foundComment = await Comments.findById(req.params.id).populate(
-      "creator",
-      "_id first_name last_name"
-    );
-    if (!foundComment) {
-      return res.status(404).json({ message: "comment not found" });
+exports.getSingleComment = [
+  verifyUser,
+  param("id").trim().isMongoId().withMessage("id should be a valid mongodb id").escape(),
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(422).json(errors);
     }
 
-    return res.status(200).json(foundComment);
-  } catch (error) {
-    return res.status(500).json({ message: "something went wrong" });
-  }
-};
+    const commentId = req.params.id;
+    try {
+      const foundComment = await Comments.findById(commentId)
+        .populate("creator", "_id first_name last_name")
+        .populate("likesCount");
+      if (!foundComment) {
+        return res.status(404).json({ message: "comment not found" });
+      }
+
+      return res.status(200).json(foundComment);
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ message: "something went wrong" });
+    }
+  },
+];
 
 exports.postComment = [
   verifyUser,
+  param("postId")
+    .trim()
+    .isMongoId()
+    .withMessage("id should be a valid mongodb id")
+    .escape(),
   body("comment_text").trim().isLength({ min: 1 }).escape(),
   async (req, res) => {
     const errors = validationResult(req);
@@ -79,8 +89,14 @@ exports.postComment = [
 
 exports.putComment = [
   verifyUser,
+  param("id").trim().isMongoId().withMessage("id should be a valid mongodb id").escape(),
   body("content.text").trim().isLength({ min: 1 }).escape(),
   async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(422).json(errors);
+    }
+
     try {
       const foundComment = await Comments.findById(req.params.id);
       if (!foundComment) {
@@ -107,7 +123,13 @@ exports.putComment = [
 
 exports.deleteComment = [
   verifyUser,
+  param("id").trim().isMongoId().withMessage("id should be a valid mongodb id").escape(),
   async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(422).json(errors);
+    }
+
     const commentId = req.params.id;
     try {
       const foundComment = await Comments.findById(commentId);
@@ -133,27 +155,34 @@ exports.deleteComment = [
 
 exports.postCommentLike = [
   verifyUser,
+  param("id").trim().isMongoId().withMessage("id should be a valid mongodb id").escape(),
   async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(422).json(errors);
+    }
+
+    const userId = req.user._id;
+    const commentId = req.params.id;
+
     try {
-      const foundComment = await Comments.findById(req.params.id);
+      const foundComment = await Comments.findById(commentId);
       if (!foundComment) {
         return res.status(404).json({ message: "comment not found" });
       }
 
-      let userLikeIndex = foundComment.likes.findIndex(
-        (element) => element.toString() === req.user._id.toString()
-      );
+      const userAlreadyLike = await commentLikes.findOne({
+        user_id: userId,
+        comment_id: commentId,
+      });
 
-      if (userLikeIndex === -1) {
-        foundComment.likes.push(req.user._id);
-        await foundComment.save();
-        return res.status(200).json(foundComment.likes);
+      if (!userAlreadyLike) {
+        await commentLikes.create({ comment_id: commentId, user_id: userId });
+        return res.status(201).json({ message: "Comment like added successfully" });
       }
 
-      foundComment.likes.splice(userLikeIndex, 1);
-      await foundComment.save();
-
-      return res.status(200).json(foundComment.likes);
+      await commentLikes.deleteOne({ comment_id: commentId, user_id: userId });
+      return res.status(200).json({ message: "Comment like removed successfully" });
     } catch (error) {
       return res.status(500).json({ message: "something went wrong" });
     }
