@@ -65,7 +65,8 @@ exports.userFeed = [
         })
         .limit(postPerQuery)
         .skip(queryPage)
-        .populate("creator", "_id first_name last_name profile_image");
+        .populate("creator", "_id first_name last_name profile_image")
+        .populate("likesCount commentCount");
       return res.status(200).json(posts);
     } catch (error) {
       return res.status(500).json({ message: "something went wrong" });
@@ -113,7 +114,8 @@ exports.userPosts = [
         })
         .limit(postPerQuery)
         .skip(queryPage)
-        .populate("creator", "_id first_name last_name profile_image");
+        .populate("creator", "_id first_name last_name profile_image")
+        .populate("likesCount commentCount");
 
       return res.status(200).json(posts);
     } catch (error) {
@@ -176,7 +178,12 @@ exports.postPost = [
       }
 
       await deleteFiles(req.files);
-      const savedPost = await (await newPost.save()).populate("likesCount commentCount");
+      const savedPost = await (
+        await newPost.save()
+      ).populate(
+        "likesCount commentCount creator",
+        "_id first_name last_name profile_image"
+      );
 
       return res.status(200).json({ new_post: savedPost });
     } catch (error) {
@@ -212,9 +219,14 @@ exports.putPost = [
       if (foundPost.creator.toString() === req.user._id.toString()) {
         foundPost.content.text = req.body.content.text;
         foundPost.edited = true;
-        await foundPost.save();
+        const savedEditedpost = await (
+          await foundPost.save()
+        ).populate(
+          "likesCount commentCount creator",
+          "_id first_name last_name profile_image"
+        );
 
-        return res.status(200).json({ edited_post: foundPost });
+        return res.status(200).json(savedEditedpost);
       }
 
       return res
