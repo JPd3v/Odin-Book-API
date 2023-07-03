@@ -6,12 +6,10 @@ const commentLikes = require("../models/commentLikes");
 
 exports.getAllComments = async (req, res) => {
   try {
-    const allComments = await Comments.find()
-      .populate(
-        "creator replies",
-        "_id first_name last_name creator edited likes timestamp content"
-      )
-      .populate("likesCount");
+    const allComments = await Comments.find().populate(
+      "creator likesCount repliesCount",
+      "_id first_name last_name profile_image"
+    );
 
     return res.status(200).json(allComments);
   } catch (error) {
@@ -30,9 +28,11 @@ exports.getSingleComment = [
 
     const commentId = req.params.id;
     try {
-      const foundComment = await Comments.findById(commentId)
-        .populate("creator", "_id first_name last_name")
-        .populate("likesCount");
+      const foundComment = await Comments.findById(commentId).populate(
+        "creator likesCount repliesCount",
+        "_id first_name last_name profile_image"
+      );
+
       if (!foundComment) {
         return res.status(404).json({ message: "comment not found" });
       }
@@ -78,7 +78,10 @@ exports.postComment = [
 
       const savedComment = await (
         await newComment.save()
-      ).populate("creator", "_id first_name last_name profile_image");
+      ).populate(
+        "creator likesCount repliesCount",
+        "_id first_name last_name profile_image"
+      );
 
       return res.status(200).json(savedComment);
     } catch (error) {
@@ -107,7 +110,12 @@ exports.putComment = [
         foundComment.content.text = req.body.content.text;
         foundComment.edited = true;
 
-        const saveEditedComment = await foundComment.save();
+        const saveEditedComment = await (
+          await foundComment.save()
+        ).populate(
+          "creator likesCount repliesCount",
+          "_id first_name last_name profile_image"
+        );
 
         return res.status(200).json({ edited_comment: saveEditedComment });
       }

@@ -24,6 +24,13 @@ commentSchema.virtual("likesCount", {
   count: true,
 });
 
+commentSchema.virtual("repliesCount", {
+  ref: "Replies",
+  localField: "_id",
+  foreignField: "comment_id",
+  count: true,
+});
+
 commentSchema.pre("deleteMany", async function () {
   try {
     const postId = this.getQuery().post_id;
