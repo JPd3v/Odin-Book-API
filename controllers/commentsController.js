@@ -1,4 +1,4 @@
-const { body, validationResult, param } = require("express-validator");
+const { body, validationResult, param, query } = require("express-validator");
 const Comments = require("../models/comment");
 const Posts = require("../models/post");
 const { verifyUser } = require("../utils/authenticate");
@@ -191,6 +191,53 @@ exports.postCommentLike = [
 
       await commentLikes.deleteOne({ comment_id: commentId, user_id: userId });
       return res.status(200).json({ message: "Comment like removed successfully" });
+    } catch (error) {
+      return res.status(500).json({ message: "something went wrong" });
+    }
+  },
+];
+
+exports.postComments = [
+  verifyUser,
+  param("postId")
+    .trim()
+    .isMongoId()
+    .withMessage("id should be a valid mongodb id")
+    .escape(),
+  query("page").trim().isInt({ min: 1 }).withMessage("page should be minimum 1").escape(),
+  query("pageSize")
+    .trim()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("pageSize should be min 1 and max 100")
+    .escape(),
+  query("sort")
+    .trim()
+    .isIn(["asc", "desc"])
+    .withMessage("sort should be asc or desc")
+    .escape(),
+
+  async (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      return res.status(422).json(errors);
+    }
+
+    const { page, pageSize, sort } = req.query;
+    const { postId } = req.params;
+
+    const currentPage = page - 1;
+    const offset = currentPage * pageSize;
+
+    try {
+      const foundComments = await Comments.find({ post_id: postId })
+        .sort({
+          timestamp: sort,
+        })
+        .limit(pageSize)
+        .skip(offset)
+        .populate("likesCount");
+      return res.status(200).json(foundComments);
     } catch (error) {
       return res.status(500).json({ message: "something went wrong" });
     }
