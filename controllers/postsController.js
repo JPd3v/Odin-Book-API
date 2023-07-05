@@ -3,8 +3,8 @@ const { verifyUser } = require("../utils/authenticate");
 const { body, validationResult, param, query } = require("express-validator");
 const multer = require("multer");
 const cloudinaryConfig = require("../config/cloudinaryconfig");
-const Comments = require("../models/comment");
 const postLikes = require("../models/postLikes");
+const { docIsLikedByUser, getPostsLikesIds } = require("../utils/docsHelpers");
 const fs = require("fs").promises;
 
 const upload = multer({
@@ -27,7 +27,8 @@ exports.getAllPosts = async (req, res) => {
   try {
     const posts = await Posts.find({})
       .populate("creator", "_id first_name last_name")
-      .populate("likesCount commentCount");
+      .populate("likesCount commentCount")
+      .lean();
 
     return res.status(200).json(posts);
   } catch (error) {
@@ -66,8 +67,14 @@ exports.userFeed = [
         .limit(postPerQuery)
         .skip(queryPage)
         .populate("creator", "_id first_name last_name profile_image")
-        .populate("likesCount commentCount");
-      return res.status(200).json(posts);
+        .populate("likesCount commentCount")
+        .lean();
+
+      const foundLikes = await getPostsLikesIds(posts, user._id);
+
+      const updatedPosts = docIsLikedByUser(posts, foundLikes);
+
+      return res.status(200).json(updatedPosts);
     } catch (error) {
       return res.status(500).json({ message: "something went wrong" });
     }
@@ -102,6 +109,8 @@ exports.userPosts = [
 
     const user = req.params.userId;
     const { page, pageSize, sort } = req.query;
+    const currentUserId = req.user._id;
+
     try {
       const currentPage = page - 1;
       const postPerQuery = pageSize;
@@ -115,10 +124,16 @@ exports.userPosts = [
         .limit(postPerQuery)
         .skip(queryPage)
         .populate("creator", "_id first_name last_name profile_image")
-        .populate("likesCount commentCount");
+        .populate("likesCount commentCount")
+        .lean();
 
-      return res.status(200).json(posts);
+      const foundLikes = await getPostsLikesIds(posts, currentUserId);
+
+      const updatedPosts = docIsLikedByUser(posts, foundLikes);
+
+      return res.status(200).json(updatedPosts);
     } catch (error) {
+      console.log(error);
       return res.status(500).json({ message: "something went wrong" });
     }
   },
@@ -185,7 +200,10 @@ exports.postPost = [
         "_id first_name last_name profile_image"
       );
 
-      return res.status(200).json({ new_post: savedPost });
+      const postObject = savedPost.toObject();
+      postObject.isLikedByUser = false;
+
+      return res.status(200).json({ new_post: postObject });
     } catch (error) {
       console.log(error);
       return res.status(500).json({ message: "something went wrong" });
@@ -208,6 +226,7 @@ exports.putPost = [
     }
 
     const postId = req.params.id;
+    const userId = req.user._id;
 
     try {
       const foundPost = await Posts.findById(postId);
@@ -216,7 +235,7 @@ exports.putPost = [
         return res.status(404).json({ message: "post not found" });
       }
 
-      if (foundPost.creator.toString() === req.user._id.toString()) {
+      if (foundPost.creator.toString() === userId.toString()) {
         foundPost.content.text = req.body.content.text;
         foundPost.edited = true;
         const savedEditedpost = await (
@@ -226,13 +245,18 @@ exports.putPost = [
           "_id first_name last_name profile_image"
         );
 
-        return res.status(200).json(savedEditedpost);
+        const foundLikes = await getPostsLikesIds([savedEditedpost], userId);
+
+        const updatedPosts = docIsLikedByUser([savedEditedpost.toObject()], foundLikes);
+
+        return res.status(200).json(updatedPosts[0]);
       }
 
       return res
         .status(403)
-        .json({ message: "you dont have permission to do edit this post" });
+        .json({ message: "you dont have permission to edit this post" });
     } catch (error) {
+      console.log(error);
       return res.status(500).json({ message: "something went wrong" });
     }
   },
