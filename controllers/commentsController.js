@@ -3,6 +3,7 @@ const Comments = require("../models/comment");
 const Posts = require("../models/post");
 const { verifyUser } = require("../utils/authenticate");
 const commentLikes = require("../models/commentLikes");
+const { docIsLikedByUser, getCommentLikesIds } = require("../utils/docsHelpers");
 
 exports.getAllComments = async (req, res) => {
   try {
@@ -60,9 +61,7 @@ exports.postComment = [
     }
 
     const postId = req.params.postId;
-    if (!postId) {
-      return res.status(400).json({ message: "postId is required" });
-    }
+    const userId = req.user._id;
 
     try {
       const foundPost = await Posts.findById(postId);
@@ -82,9 +81,12 @@ exports.postComment = [
         "creator likesCount repliesCount",
         "_id first_name last_name profile_image"
       );
+      const postObject = savedComment.toObject();
+      postObject.isLikedByUser = false;
 
-      return res.status(200).json(savedComment);
+      return res.status(200).json(postObject);
     } catch (error) {
+      console.log(error);
       return res.status(500).json({ message: "something went wrong" });
     }
   },
@@ -101,6 +103,8 @@ exports.putComment = [
     }
 
     try {
+      const userId = req.user._id;
+
       const foundComment = await Comments.findById(req.params.id);
       if (!foundComment) {
         return res.status(404).json({ message: "comment not found" });
@@ -117,13 +121,20 @@ exports.putComment = [
           "_id first_name last_name profile_image"
         );
 
-        return res.status(200).json({ edited_comment: saveEditedComment });
+        const foundLikes = await getCommentLikesIds([saveEditedComment], userId);
+        const commentWithIsLiked = docIsLikedByUser(
+          [saveEditedComment.toObject()],
+          foundLikes
+        );
+
+        return res.status(200).json(commentWithIsLiked);
       }
 
       return res
         .status(403)
         .json({ message: "you dont have permission to do edit this comment" });
     } catch (error) {
+      console.log(error);
       return res.status(500).json({ message: "something went wrong" });
     }
   },
@@ -225,6 +236,7 @@ exports.postComments = [
 
     const { page, pageSize, sort } = req.query;
     const { postId } = req.params;
+    const userId = req.user._id;
 
     const currentPage = page - 1;
     const offset = currentPage * pageSize;
@@ -236,9 +248,16 @@ exports.postComments = [
         })
         .limit(pageSize)
         .skip(offset)
-        .populate("likesCount");
-      return res.status(200).json(foundComments);
+        .populate("likesCount repliesCount")
+        .populate("creator", "_id first_name last_name profile_image")
+        .lean();
+
+      const foundLikes = await getCommentLikesIds(foundComments, userId);
+      const commentWithIsLiked = docIsLikedByUser(foundComments, foundLikes);
+
+      return res.status(200).json(commentWithIsLiked);
     } catch (error) {
+      console.log(error);
       return res.status(500).json({ message: "something went wrong" });
     }
   },

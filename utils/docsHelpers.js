@@ -1,4 +1,5 @@
 const postLikes = require("../models/postLikes");
+const commentLikes = require("../models/commentLikes");
 
 function docIsLikedByUser(mongooseDocs, likedIds) {
   const updatedDocs = mongooseDocs.map((doc) => {
@@ -26,4 +27,17 @@ async function getPostsLikesIds(postsDocs, userId) {
   return foundLikes.map((like) => like.post_id.toString());
 }
 
-module.exports = { docIsLikedByUser, docsIds, getPostsLikesIds };
+async function getCommentLikesIds(postsDocs, userId) {
+  const commentIds = docsIds(postsDocs);
+
+  const foundLikes = await commentLikes
+    .find({
+      comment_id: { $in: commentIds },
+      user_id: userId,
+    })
+    .lean();
+
+  return foundLikes.map((like) => like.comment_id.toString());
+}
+
+module.exports = { docIsLikedByUser, getPostsLikesIds, getCommentLikesIds };
