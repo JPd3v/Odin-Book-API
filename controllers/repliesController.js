@@ -3,6 +3,7 @@ const { body, validationResult, param, query } = require("express-validator");
 const Comments = require("../models/comment");
 const Replies = require("../models/replies");
 const repliesLikes = require("../models/repliesLikes");
+const { getReplyLikesIds, docIsLikedByUser } = require("../utils/docsHelpers");
 
 exports.postReply = [
   verifyUser,
@@ -37,9 +38,12 @@ exports.postReply = [
         await newReply.save()
       ).populate("creator likesCount", "_id first_name last_name profile_image");
 
-      await parentComment.save();
-      return res.status(200).json(savedNewreply);
+      const replyObject = savedNewreply.toObject();
+      replyObject.isLikedByUser = false;
+
+      return res.status(200).json(replyObject);
     } catch (error) {
+      console.log(error);
       return res.status(500).json({ message: "something went wrong" });
     }
   },
@@ -60,6 +64,7 @@ exports.putReply = [
       return res.status(422).json(errors);
     }
 
+    const userId = req.user._id;
     const replyId = req.params.replyId;
     try {
       const foundReply = await Replies.findById(replyId);
@@ -75,7 +80,10 @@ exports.putReply = [
           await foundReply.save()
         ).populate("creator likesCount", "_id first_name last_name profile_image");
 
-        return res.status(200).json({ saved_reply: saveReply });
+        const replyLikeIds = getReplyLikesIds([saveReply], userId);
+        const replyLikedByUser = docIsLikedByUser([saveReply.toObject()], replyLikeIds);
+
+        return res.status(200).json(replyLikedByUser[0]);
       }
       return res
         .status(403)
@@ -109,9 +117,7 @@ exports.deleteReply = [
 
       if (foundReply.creator.toString() === req.user._id.toString()) {
         await Replies.findByIdAndDelete(replyId);
-        await Comments.findByIdAndUpdate(foundReply.comment_id, {
-          $pull: { replies: foundReply._id },
-        });
+
         return res.status(200).json({ message: "reply deleted succefully" });
       }
 
@@ -185,6 +191,7 @@ exports.commentReplies = [
     }
 
     const commentId = req.params.id;
+    const userId = req.user._id;
     const { page, pageSize, sort } = req.query;
     try {
       const currentPage = page - 1;
@@ -196,10 +203,15 @@ exports.commentReplies = [
         })
         .limit(pageSize)
         .skip(offset)
-        .populate("likesCount");
+        .populate("likesCount creator", "_id first_name last_name profile_image")
+        .lean();
 
-      return res.status(500).json(foundCommentReplies);
+      const replyLikeIds = await getReplyLikesIds(foundCommentReplies, userId);
+      const repliesLikedByUser = docIsLikedByUser(foundCommentReplies, replyLikeIds);
+
+      return res.status(200).json(repliesLikedByUser);
     } catch (error) {
+      console.log(error);
       return res.status(500).json({ message: "something went wrong" });
     }
   },
