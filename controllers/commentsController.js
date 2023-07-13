@@ -127,7 +127,7 @@ exports.putComment = [
           foundLikes
         );
 
-        return res.status(200).json(commentWithIsLiked);
+        return res.status(200).json(commentWithIsLiked[0]);
       }
 
       return res

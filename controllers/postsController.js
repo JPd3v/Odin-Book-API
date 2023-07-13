@@ -203,7 +203,7 @@ exports.postPost = [
       const postObject = savedPost.toObject();
       postObject.isLikedByUser = false;
 
-      return res.status(200).json({ new_post: postObject });
+      return res.status(200).json(postObject);
     } catch (error) {
       console.log(error);
       return res.status(500).json({ message: "something went wrong" });

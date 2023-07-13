@@ -80,7 +80,7 @@ exports.putReply = [
           await foundReply.save()
         ).populate("creator likesCount", "_id first_name last_name profile_image");
 
-        const replyLikeIds = getReplyLikesIds([saveReply], userId);
+        const replyLikeIds = await getReplyLikesIds([saveReply], userId);
         const replyLikedByUser = docIsLikedByUser([saveReply.toObject()], replyLikeIds);
 
         return res.status(200).json(replyLikedByUser[0]);
